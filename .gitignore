@@ -1,0 +1,21 @@
+# Environment variables — NEVER push these
+.env
+*.env
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node (if any)
+node_modules/

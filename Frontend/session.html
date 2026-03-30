@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Nexora — Study Session</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+<style>
+  :root{
+    --bg:#0b0c0f;--surface:#13151a;--surface2:#1c1f27;
+    --border:#252830;--accent:#c8f04d;--accent2:#4df0c8;
+    --warn:#f09d4d;--danger:#f04d7a;
+    --text:#e8eaf0;--muted:#6b7280;--muted2:#9ca3af;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;font-size:14px;min-height:100vh;display:flex;flex-direction:column;}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.35;}
+
+  /* ── TOPBAR ── */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:50;}
+  .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:8px;}
+  .logo-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+  .topbar-center{display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .session-topic{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--text);display:flex;align-items:center;gap:8px;}
+  .status-pill{padding:2px 10px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;}
+  .s-idle{background:var(--border);color:var(--muted);}
+  .s-active{background:rgba(200,240,77,0.15);color:var(--accent);}
+  .s-paused{background:rgba(240,157,77,0.15);color:var(--warn);}
+  .timer{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;letter-spacing:-0.5px;color:var(--text);font-variant-numeric:tabular-nums;}
+  .t-btn{padding:8px 16px;border-radius:5px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text);text-decoration:none;transition:border-color 0.15s;display:inline-block;}
+  .t-btn:hover{border-color:var(--muted);}
+
+  /* ── LAYOUT ── */
+  .main{flex:1;display:grid;grid-template-columns:1fr 320px;grid-template-rows:1fr auto;min-height:0;}
+
+  /* ── CAMERA AREA ── */
+  .camera-area{padding:20px 24px;display:flex;flex-direction:column;gap:14px;border-right:1px solid var(--border);overflow:auto;}
+  .camera-wrapper{position:relative;background:#000;border-radius:10px;overflow:hidden;border:1px solid var(--border);aspect-ratio:16/9;width:100%;}
+
+  /* Camera states */
+  .cam-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity 0.3s;}
+  #state-requesting{background:var(--surface);}
+  #state-denied{background:#1a0f0f;}
+
+  #videoFeed{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;position:absolute;inset:0;}
+  #analysisCanvas{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1);opacity:0;pointer-events:none;}
+
+  .cam-icon-big{font-size:40px;opacity:0.5;}
+  .cam-state-title{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;}
+  .cam-state-sub{font-size:12px;color:var(--muted2);text-align:center;max-width:200px;line-height:1.6;}
+  .cam-req-btn{background:var(--accent);color:#0b0c0f;padding:10px 22px;border-radius:6px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;border:none;cursor:pointer;transition:opacity 0.15s;}
+  .cam-req-btn:hover{opacity:0.88;}
+  .denied-icon{font-size:40px;}
+
+  /* Overlays on live feed */
+  .live-badge{position:absolute;top:10px;left:10px;background:rgba(11,12,15,0.82);border:1px solid var(--border);border-radius:100px;padding:4px 10px;font-size:11px;color:var(--accent);display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px);z-index:10;}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blinkDot 1s infinite;}
+  @keyframes blinkDot{0%,100%{opacity:1;}50%{opacity:0.15;}}
+  .no-store-badge{position:absolute;bottom:10px;right:10px;background:rgba(11,12,15,0.75);border:1px solid var(--border);border-radius:100px;padding:3px 9px;font-size:10px;color:var(--muted2);backdrop-filter:blur(8px);z-index:10;}
+
+  /* Motion indicator dot */
+  .motion-dot{position:absolute;top:10px;right:10px;background:rgba(11,12,15,0.82);border:1px solid var(--border);border-radius:100px;padding:4px 10px;font-size:11px;color:var(--muted2);display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px);z-index:10;}
+  .motion-indicator{width:6px;height:6px;border-radius:50%;background:var(--muted);transition:background 0.3s;}
+  .motion-indicator.active{background:var(--accent2);}
+
+  /* ── SIGNAL CARDS ── */
+  .signal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .sig-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:6px;transition:border-color 0.4s,background 0.4s;}
+  .sig-card.ok{border-color:rgba(200,240,77,0.25);background:rgba(200,240,77,0.02);}
+  .sig-card.warn{border-color:rgba(240,157,77,0.4);background:rgba(240,157,77,0.03);}
+  .sig-card.bad{border-color:rgba(240,77,122,0.4);background:rgba(240,77,122,0.03);}
+  .sig-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;}
+  .sig-val{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;letter-spacing:-0.5px;transition:color 0.3s;}
+  .sig-bar-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .sig-bar-fill{height:100%;border-radius:2px;transition:width 0.6s ease,background 0.4s;}
+
+  /* Signal card hover glow */
+  .sig-card{transition:transform 0.2s,box-shadow 0.2s,border-color 0.4s,background 0.4s;}
+  .sig-card:hover{transform:translateY(-2px);}
+  .sig-card.ok:hover{box-shadow:0 4px 16px rgba(200,240,77,0.12);}
+  .sig-card.warn:hover{box-shadow:0 4px 16px rgba(240,157,77,0.12);}
+  .sig-card.bad:hover{box-shadow:0 4px 16px rgba(240,77,122,0.12);}
+
+  /* Topbar active session glow */
+  .topbar.session-active{box-shadow:0 1px 0 rgba(200,240,77,0.15),0 2px 20px rgba(200,240,77,0.05);}
+
+  /* Ctrl bar session active highlight */
+  .ctrl-bar.active{border-top-color:rgba(200,240,77,0.2);}
+
+  /* ── CONTROLS ── */
+  .ctrl-bar{grid-column:1/-1;border-top:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;gap:10px;background:var(--surface);}
+  .ctrl-btn{padding:11px 22px;border-radius:6px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;transition:all 0.15s;letter-spacing:0.02em;}
+  .c-start{background:var(--accent);color:#0b0c0f;border:none;}
+  .c-start:hover{opacity:0.88;}
+  .c-pause{background:transparent;color:var(--warn);border:1px solid rgba(240,157,77,0.4);}
+  .c-pause:hover{background:rgba(240,157,77,0.08);}
+  .c-end{background:transparent;color:var(--danger);border:1px solid rgba(240,77,122,0.4);}
+  .c-end:hover{background:rgba(240,77,122,0.08);}
+  .c-off{background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:not-allowed;opacity:0.45;}
+  .ctrl-sep{flex:1;}
+  .ctrl-note{font-size:12px;color:var(--muted);}
+
+  /* ── SIDEBAR ── */
+  .sidebar{display:flex;flex-direction:column;overflow-y:auto;max-height:calc(100vh - 57px - 57px);}
+
+  .ring-panel{padding:20px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .ring-header{width:100%;display:flex;justify-content:space-between;align-items:center;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;}
+  .ring-badge{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;font-weight:400;text-transform:uppercase;letter-spacing:0.1em;}
+  .ring-wrap{position:relative;width:110px;height:110px;}
+  .ring-svg{transform:rotate(-90deg);filter:drop-shadow(0 0 0px transparent);transition:filter 0.8s ease;}
+  .ring-svg.glow-green {filter:drop-shadow(0 0 10px rgba(200,240,77,0.6));}
+  .ring-svg.glow-warn  {filter:drop-shadow(0 0 10px rgba(240,157,77,0.5));}
+  .ring-svg.glow-danger{filter:drop-shadow(0 0 10px rgba(240,77,122,0.5));}
+  .ring-bg-c{fill:none;stroke:var(--border);stroke-width:8;}
+  .ring-fill-c{fill:none;stroke:var(--accent);stroke-width:8;stroke-linecap:round;stroke-dasharray:298;stroke-dashoffset:298;transition:stroke-dashoffset 0.8s ease,stroke 0.5s;}
+  @keyframes ringPulse{0%,100%{opacity:1;}50%{opacity:0.65;}}
+  .ring-fill-c.pulsing{animation:ringPulse 2s ease infinite;}
+  .ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .ring-num{font-family:'Syne',sans-serif;font-weight:800;font-size:26px;letter-spacing:-1px;line-height:1;transition:color 0.5s;}
+  .ring-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;}
+  .ring-status{font-size:11px;color:var(--muted2);text-align:center;transition:color 0.5s;}
+
+  .setup-panel{padding:18px 20px;border-bottom:1px solid var(--border);}
+  .p-title{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;}
+  .p-badge{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;font-weight:400;text-transform:uppercase;}
+  .f-field{margin-bottom:10px;}
+  .f-field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:5px;}
+  .f-field input,.f-field select,.f-field textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:9px 11px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;transition:border-color 0.2s;resize:none;}
+  .f-field input:focus,.f-field select:focus,.f-field textarea:focus{border-color:rgba(200,240,77,0.4);}
+  .f-field select option{background:var(--surface2);}
+
+  .alerts-panel{padding:18px 20px;flex:1;}
+  .alert-item{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:6px;margin-bottom:7px;font-size:12px;line-height:1.5;border:1px solid;animation:slideIn 0.25s ease;}
+  @keyframes slideIn{from{opacity:0;transform:translateX(5px);}to{opacity:1;transform:translateX(0);}}
+  .a-info{background:rgba(77,240,200,0.04);border-color:rgba(77,240,200,0.18);color:var(--accent2);}
+  .a-warn{background:rgba(240,157,77,0.05);border-color:rgba(240,157,77,0.22);color:var(--warn);}
+  .a-bad{background:rgba(240,77,122,0.05);border-color:rgba(240,77,122,0.22);color:var(--danger);}
+  .a-icon{font-size:13px;margin-top:1px;}
+  .a-time{font-size:10px;color:var(--muted);margin-top:3px;}
+  .no-alerts{color:var(--muted);font-size:12px;text-align:center;padding:14px 0;line-height:1.6;}
+
+  /* ── POPUP ── */
+  .popup-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity 0.25s;}
+  .popup-overlay.show{opacity:1;pointer-events:auto;}
+  .popup-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px 40px;max-width:440px;width:90%;text-align:center;transform:translateY(16px) scale(0.97);transition:transform 0.25s;position:relative;overflow:hidden;}
+  .popup-overlay.show .popup-box{transform:translateY(0) scale(1);}
+  .popup-box::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(200,240,77,0.06),transparent 70%);pointer-events:none;}
+  .popup-icon{font-size:48px;margin-bottom:16px;display:block;}
+  .popup-title{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;letter-spacing:-0.5px;margin-bottom:10px;line-height:1.2;}
+  .popup-msg{font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:28px;}
+  .popup-timer-ring{width:70px;height:70px;margin:0 auto 24px;position:relative;}
+  .pt-svg{transform:rotate(-90deg);}
+  .pt-bg{fill:none;stroke:var(--border);stroke-width:5;}
+  .pt-fill{fill:none;stroke:var(--accent);stroke-width:5;stroke-linecap:round;stroke-dasharray:188;stroke-dashoffset:0;transition:stroke-dashoffset 1s linear;}
+  .pt-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--accent);}
+  .popup-actions{display:flex;gap:10px;justify-content:center;}
+  .popup-btn-primary{background:var(--accent);color:#0b0c0f;padding:11px 26px;border-radius:6px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;border:none;cursor:pointer;transition:opacity 0.15s;}
+  .popup-btn-primary:hover{opacity:0.88;}
+  .popup-btn-secondary{background:transparent;color:var(--muted2);padding:11px 20px;border-radius:6px;font-family:'Syne',sans-serif;font-weight:600;font-size:13px;border:1px solid var(--border);cursor:pointer;transition:border-color 0.15s;}
+  .popup-btn-secondary:hover{border-color:var(--muted);}
+  .popup-box.break::before{background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(77,240,200,0.08),transparent 70%);}
+  .popup-box.distracted::before{background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(240,157,77,0.08),transparent 70%);}
+  .popup-box.great::before{background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(200,240,77,0.08),transparent 70%);}
+
+  /* ── TOAST ── */
+  .toast-container{position:fixed;top:72px;right:20px;z-index:900;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+  .toast{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:12px;line-height:1.5;max-width:280px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 4px 24px rgba(0,0,0,0.4);pointer-events:auto;animation:toastIn 0.3s ease forwards;transform-origin:top right;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(12px) scale(0.96);}to{opacity:1;transform:translateX(0) scale(1);}}
+  @keyframes toastOut{from{opacity:1;transform:translateX(0);}to{opacity:0;transform:translateX(12px);}}
+  .toast.t-warn{border-color:rgba(240,157,77,0.3);}
+  .toast.t-bad{border-color:rgba(240,77,122,0.3);}
+  .toast.t-good{border-color:rgba(200,240,77,0.3);}
+  .toast-icon{font-size:16px;flex-shrink:0;}
+  .toast-title{font-family:'Syne',sans-serif;font-weight:700;font-size:12px;margin-bottom:2px;}
+  .toast-close{margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;flex-shrink:0;padding:0;}
+
+  /* ── PiP BUTTON ── */
+  .pip-btn{
+    padding:7px 14px;border-radius:5px;
+    font-family:'Syne',sans-serif;font-weight:700;font-size:11px;
+    cursor:pointer;border:1px solid rgba(200,240,77,0.3);
+    background:rgba(200,240,77,0.06);color:var(--accent);
+    transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;
+  }
+  .pip-btn:hover{background:rgba(200,240,77,0.12);border-color:var(--accent);}
+  .pip-btn:disabled{opacity:0.3;cursor:not-allowed;}
+  .pip-btn.active{background:rgba(200,240,77,0.15);border-color:var(--accent);}
+
+  /* ── PiP CANVAS (draws focus ring + score into video) ── */
+  #pipCanvas{display:none;}
+
+  /* ── USER MENU ── */
+  .user-menu{position:relative;display:inline-block;}
+  .user-btn{
+    display:flex;align-items:center;gap:8px;
+    padding:6px 12px;border-radius:5px;
+    border:1px solid var(--border);background:var(--surface2);
+    color:var(--text);cursor:pointer;font-family:'DM Mono',monospace;
+    font-size:12px;transition:border-color 0.15s;
+  }
+  .user-btn:hover{border-color:var(--muted);}
+  .user-avatar{
+    width:24px;height:24px;border-radius:50%;
+    background:rgba(200,240,77,0.15);border:1px solid rgba(200,240,77,0.3);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Syne',sans-serif;font-weight:800;font-size:11px;color:var(--accent);
+    flex-shrink:0;
+  }
+  .user-dropdown{
+    position:absolute;top:calc(100% + 6px);right:0;
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:8px;padding:6px;min-width:180px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.4);
+    display:none;z-index:200;
+  }
+  .user-dropdown.open{display:block;}
+  .dropdown-header{
+    padding:8px 10px 10px;border-bottom:1px solid var(--border);
+    margin-bottom:4px;
+  }
+  .dropdown-name{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--text);}
+  .dropdown-email{font-size:10px;color:var(--muted);margin-top:2px;}
+  .dropdown-item{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 10px;border-radius:5px;
+    font-size:12px;color:var(--muted2);cursor:pointer;
+    transition:background 0.15s;text-decoration:none;
+  }
+  .dropdown-item:hover{background:var(--surface2);color:var(--text);}
+  .dropdown-item.danger{color:var(--danger);}
+  .dropdown-item.danger:hover{background:rgba(240,77,122,0.08);}
+
+  /* ── COACH CHAT ── */
+  .panel-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:12px;}
+  .panel-tab{padding:8px 14px;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;color:var(--muted);background:transparent;border:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color 0.15s;}
+  .panel-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+  .panel-pane{display:none;flex:1;flex-direction:column;}
+  .panel-pane.active{display:flex;}
+  .chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;max-height:160px;}
+  .chat-messages::-webkit-scrollbar{width:2px;}
+  .chat-messages::-webkit-scrollbar-thumb{background:var(--border);}
+  .chat-bubble{padding:9px 12px;border-radius:8px;font-size:12px;line-height:1.5;max-width:95%;}
+  .chat-bubble.user{background:rgba(200,240,77,0.08);border:1px solid rgba(200,240,77,0.18);color:var(--text);align-self:flex-end;border-bottom-right-radius:2px;}
+  .chat-bubble.bot{background:var(--surface2);border:1px solid var(--border);color:var(--muted2);align-self:flex-start;border-bottom-left-radius:2px;}
+  .chat-bubble.bot strong{color:var(--accent2);}
+  .chat-typing{color:var(--muted);font-size:11px;padding:4px 0;display:none;}
+  .chat-input-row{display:flex;gap:6px;margin-top:10px;}
+  .chat-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;resize:none;transition:border-color 0.2s;}
+  .chat-input:focus{border-color:rgba(200,240,77,0.4);}
+  .chat-send{background:var(--accent);color:#0b0c0f;border:none;border-radius:5px;padding:8px 12px;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;cursor:pointer;transition:opacity 0.15s;flex-shrink:0;}
+  .chat-send:hover{opacity:0.88;}
+  .chat-send:disabled{opacity:0.4;cursor:not-allowed;}
+  .chat-empty{color:var(--muted);font-size:11px;text-align:center;padding:16px 0;line-height:1.7;}
+
+  @media(max-width:900px){
+    .main{grid-template-columns:1fr;}
+    .sidebar{display:none;}
+    .camera-area{border-right:none;}
+    .signal-grid{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ══ -->
+<div class="topbar">
+  <a href="index.html" class="logo"><span class="logo-dot"></span>Nexora</a>
+  <div class="topbar-center">
+    <div class="session-topic">
+      <span id="session-label">No active session</span>
+      <span class="status-pill s-idle" id="status-pill">Idle</span>
+    </div>
+    <div class="timer" id="timer">00:00:00</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="pip-btn" id="pipBtn" onclick="togglePiP()" disabled title="Float focus monitor over other windows">
+      ⧉ Float Monitor
+    </button>
+    <a href="quiz.html" class="t-btn">Quiz →</a>
+    <a href="dashboard.html" class="t-btn">Dashboard</a>
+
+    <!-- User menu -->
+    <div class="user-menu" id="userMenu">
+      <button class="user-btn" onclick="toggleUserMenu()">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <span id="userGreeting">Hello…</span>
+        <span style="color:var(--muted);font-size:10px;">▾</span>
+      </button>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dropdown-header">
+          <div class="dropdown-name" id="dropdownName">—</div>
+          <div class="dropdown-email" id="dropdownEmail">—</div>
+        </div>
+        <a href="dashboard.html" class="dropdown-item">
+          📊 &nbsp;Dashboard
+        </a>
+        <a href="quiz.html" class="dropdown-item">
+          🧠 &nbsp;Take a Quiz
+        </a>
+        <div class="dropdown-item danger" onclick="logout()">
+          ⎋ &nbsp;Logout
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden canvas used to compose PiP overlay (focus score drawn onto video) -->
+<canvas id="pipCanvas" width="640" height="360"></canvas>
+
+<div class="main">
+
+  <!-- ══ CAMERA + SIGNALS ══ -->
+  <div class="camera-area">
+    <div class="camera-wrapper">
+
+      <!-- STATE: Requesting permission -->
+      <div class="cam-state" id="state-requesting">
+        <div class="cam-icon-big">📷</div>
+        <div class="cam-state-title">Enable Camera Tracking</div>
+        <div class="cam-state-sub">Nexora measures eye openness, blink rate &amp; head movement to compute your focus score. No video is ever stored.<br/><br/><span style="color:var(--accent);font-size:11px;">⚠ Must be served via http://localhost or https:// — not file://</span></div>
+        <button class="cam-req-btn" onclick="requestCamera()">Enable Camera</button>
+      </div>
+
+      <!-- STATE: Permission denied / error -->
+      <div class="cam-state" id="state-denied" style="display:none;">
+        <div class="denied-icon">🚫</div>
+        <div class="cam-state-title" style="color:var(--danger)">Camera Blocked</div>
+        <div class="cam-state-sub">Please allow camera access in your browser settings and reload the page.</div>
+        <button class="cam-req-btn" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);" onclick="requestCamera()">Retry</button>
+      </div>
+
+      <!-- LIVE VIDEO -->
+      <video id="videoFeed" autoplay muted playsinline style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);"></video>
+      <canvas id="analysisCanvas" style="display:none;"></canvas>
+
+      <!-- Live overlays -->
+      <div id="liveOverlays" style="display:none;">
+        <div class="live-badge"><span class="live-dot"></span> Tracking Live</div>
+        <div class="motion-dot">
+          <div class="motion-indicator" id="motionDot"></div>
+          <span id="motionLabel">No motion</span>
+        </div>
+        <div class="no-store-badge">⚡ No video stored</div>
+      </div>
+
+    </div>
+
+    <!-- SIGNAL CARDS -->
+    <div class="signal-grid">
+      <div class="sig-card" id="card-eye">
+        <div class="sig-label">Eye Openness</div>
+        <div class="sig-val" id="sig-eye" style="color:var(--muted)">—</div>
+        <div class="sig-bar-track"><div class="sig-bar-fill" id="bar-eye" style="width:0%;background:var(--accent)"></div></div>
+      </div>
+      <div class="sig-card" id="card-blink">
+        <div class="sig-label">Blink Rate</div>
+        <div class="sig-val" id="sig-blink" style="color:var(--muted)">—</div>
+        <div class="sig-bar-track"><div class="sig-bar-fill" id="bar-blink" style="width:0%;background:var(--accent2)"></div></div>
+      </div>
+      <div class="sig-card" id="card-motion">
+        <div class="sig-label">Head Motion</div>
+        <div class="sig-val" id="sig-motion" style="color:var(--muted)">—</div>
+        <div class="sig-bar-track"><div class="sig-bar-fill" id="bar-motion" style="width:0%;background:var(--warn)"></div></div>
+      </div>
+      <div class="sig-card" id="card-inact">
+        <div class="sig-label">Still Time</div>
+        <div class="sig-val" id="sig-inact" style="color:var(--muted)">—</div>
+        <div class="sig-bar-track"><div class="sig-bar-fill" id="bar-inact" style="width:0%;background:var(--danger)"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SIDEBAR ══ -->
+  <div class="sidebar">
+
+    <!-- Focus Ring -->
+    <div class="ring-panel">
+      <div class="ring-header">Focus Score <span class="ring-badge">Live</span></div>
+      <div class="ring-wrap">
+        <svg class="ring-svg" width="110" height="110" viewBox="0 0 110 110">
+          <circle class="ring-bg-c" cx="55" cy="55" r="47"/>
+          <circle class="ring-fill-c" id="ringFill" cx="55" cy="55" r="47"/>
+        </svg>
+        <div class="ring-center">
+          <div class="ring-num" id="ringScore">0</div>
+          <div class="ring-lbl">Focus</div>
+        </div>
+      </div>
+      <div class="ring-status" id="ringStatus">Start a session to begin tracking</div>
+    </div>
+
+    <!-- Session Setup -->
+    <div class="setup-panel">
+      <div class="p-title">Session Setup <span class="p-badge">Required</span></div>
+      <div class="f-field">
+        <label>Topic / Subject</label>
+        <input type="text" id="topicInput" placeholder="e.g. Thermodynamics Ch. 4"/>
+      </div>
+      <div class="f-field">
+        <label>Study Goal</label>
+        <textarea rows="2" id="goalInput" placeholder="What do you want to accomplish?"></textarea>
+      </div>
+      <div class="f-field">
+        <label>Planned Duration</label>
+        <select id="durationSelect">
+          <option value="25">25 min (Pomodoro)</option>
+          <option value="45">45 minutes</option>
+          <option value="60">1 hour</option>
+          <option value="90">1.5 hours</option>
+          <option value="0">No limit</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Alerts + Coach tabbed panel -->
+    <div class="alerts-panel" style="display:flex;flex-direction:column;">
+      <div class="panel-tabs">
+        <button class="panel-tab active" onclick="switchPanel('alerts',this)">Alerts <span id="alert-count" style="background:rgba(200,240,77,0.15);color:var(--accent);padding:1px 5px;border-radius:3px;font-size:9px;margin-left:3px;">0</span></button>
+        <button class="panel-tab" onclick="switchPanel('coach',this)">🧠 Coach</button>
+      </div>
+
+      <!-- ALERTS PANE -->
+      <div id="pane-alerts" class="panel-pane active" style="flex-direction:column;overflow-y:auto;flex:1;">
+        <div id="alertsList">
+          <div class="no-alerts" id="noAlerts">Alerts will appear once your session starts.</div>
+        </div>
+      </div>
+
+      <!-- COACH PANE -->
+      <div id="pane-coach" class="panel-pane" style="min-height:0;">
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-empty">Your study coach is ready.<br/>Ask anything — focus tips, concept help, motivation.</div>
+        </div>
+        <div class="chat-typing" id="chatTyping">Coach is thinking…</div>
+        <div class="chat-input-row">
+          <textarea class="chat-input" id="chatInput" rows="2"
+            placeholder="Ask your coach…"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoachMessage();}"></textarea>
+          <button class="chat-send" id="chatSendBtn" onclick="sendCoachMessage()">Send</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ CONTROLS BAR ══ -->
+  <div class="ctrl-bar">
+    <button class="ctrl-btn c-start" id="btnStart" onclick="startSession()">▶ Start Session</button>
+    <button class="ctrl-btn c-off"   id="btnPause" onclick="togglePause()" disabled>⏸ Pause</button>
+    <button class="ctrl-btn c-off"   id="btnEnd"   onclick="endSession()"  disabled>■ End & Save</button>
+    <div class="ctrl-sep"></div>
+    <span class="ctrl-note" id="ctrl-note">Allow camera access, then start your session.</span>
+  </div>
+
+</div>
+
+<!-- ══ POPUP MODAL ══ -->
+<div class="popup-overlay" id="popup">
+  <div class="popup-box" id="popupBox">
+    <span class="popup-icon" id="popupIcon">☕</span>
+    <div class="popup-title" id="popupTitle">Time for a Break</div>
+    <div class="popup-timer-ring" id="popupTimerRing" style="display:none;">
+      <svg class="pt-svg" width="70" height="70" viewBox="0 0 70 70">
+        <circle class="pt-bg" cx="35" cy="35" r="30"/>
+        <circle class="pt-fill" id="ptFill" cx="35" cy="35" r="30"/>
+      </svg>
+      <div class="pt-label" id="ptLabel">15:00</div>
+    </div>
+    <div class="popup-msg" id="popupMsg">You've been studying for a while. A short break helps consolidate memory and restore focus.</div>
+    <div class="popup-actions">
+      <button class="popup-btn-primary" id="popupPrimary" onclick="dismissPopup()">Got it</button>
+      <button class="popup-btn-secondary" id="popupSecondary" onclick="dismissPopup()" style="display:none;">Skip Break</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOAST CONTAINER ══ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* ════════════════════════════════════════
+   API HELPERS
+   All backend calls go through here.
+   Token + user_id come from localStorage
+   (set by login.html on successful login).
+════════════════════════════════════════ */
+const API_BASE = 'http://localhost:8000';
+
+function getToken() {
+  return localStorage.getItem('token');
+}
+
+async function api(path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': 'Bearer ' + getToken(),
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res  = await fetch(API_BASE + path, opts);
+  const data = await res.json();
+  if (!res.ok) {
+    // If token expired/invalid, send back to login
+    if (res.status === 401) {
+      localStorage.clear();
+      window.location.href = 'login.html';
+    }
+    throw new Error(data.detail || 'API error');
+  }
+  return data;
+}
+
+/* ════════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
+let sessionActive   = false;
+let sessionPaused   = false;
+let sessionStart    = null;
+let pausedElapsed   = 0;
+let timerIv         = null;
+let analysisIv      = null;
+let metricsIv       = null;      // ← posts to backend every 2s
+let breakReminderIv = null;
+let stream          = null;
+let cameraReady     = false;
+
+// CV WebSocket state
+let cvSocket        = null;
+let cvConnected     = false;
+let cvFrameIv       = null;       // sends frames to CV server at 5fps
+let cvRetryTimeout  = null;
+
+// Live signal values — updated by CV server responses,
+// read by the metrics poster every 2 seconds
+let live = {
+  eyeOpenness:  50,
+  blinkRate:    12,
+  headMotion:   20,
+  stillSec:     0,
+  faceDetected: false,
+  focusScore:   70,
+  fatigueIndex: 20,
+};
+
+// For notifications
+let focusScoreHistory   = [];
+let lastDistractionToast= 0;
+let lastBreakPopupTime  = 0;
+let breakTimerIv        = null;
+
+/* ════════════════════════════════════════
+   GUARD: redirect to login if no token
+════════════════════════════════════════ */
+(function checkAuth() {
+  if (!getToken()) {
+    window.location.href = 'login.html';
+  }
+})();
+
+/* ════════════════════════════════════════
+   USER MENU
+════════════════════════════════════════ */
+(function initUserMenu() {
+  const name  = localStorage.getItem('name')    || 'Student';
+  const email = localStorage.getItem('email')   || '';
+  const initial = name.charAt(0).toUpperCase();
+
+  // Avatar initial
+  const avatarEl = document.getElementById('userAvatar');
+  if (avatarEl) avatarEl.textContent = initial;
+
+  // Greeting — first name only
+  const firstName = name.split(' ')[0];
+  const greetEl   = document.getElementById('userGreeting');
+  if (greetEl) greetEl.textContent = `Hi, ${firstName}`;
+
+  // Dropdown
+  const nameEl  = document.getElementById('dropdownName');
+  const emailEl = document.getElementById('dropdownEmail');
+  if (nameEl)  nameEl.textContent  = name;
+  if (emailEl) emailEl.textContent = email || 'Logged in';
+
+  // Set session label placeholder with name
+  const sessionLabel = document.getElementById('session-label');
+  if (sessionLabel && sessionLabel.textContent === 'No active session') {
+    sessionLabel.textContent = `${firstName}'s Session`;
+  }
+})();
+
+function toggleUserMenu() {
+  const dropdown = document.getElementById('userDropdown');
+  dropdown.classList.toggle('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('userMenu');
+  if (menu && !menu.contains(e.target)) {
+    document.getElementById('userDropdown').classList.remove('open');
+  }
+});
+
+function logout() {
+  if (sessionActive) {
+    if (!confirm('You have an active session. End it and logout?')) return;
+  }
+  // Clear all stored data
+  localStorage.clear();
+  window.location.href = 'login.html';
+}
+
+/* ════════════════════════════════════════
+   TIMER
+════════════════════════════════════════ */
+const pad = n => String(n).padStart(2, '0');
+
+function getElapsed() {
+  if (!sessionStart) return pausedElapsed;
+  return pausedElapsed + Math.floor((Date.now() - sessionStart) / 1000);
+}
+
+function updateTimer() {
+  const e = getElapsed();
+  document.getElementById('timer').textContent =
+    `${pad(Math.floor(e / 3600))}:${pad(Math.floor((e % 3600) / 60))}:${pad(e % 60)}`;
+}
+
+/* ════════════════════════════════════════
+   CAMERA — button-triggered only
+════════════════════════════════════════ */
+async function requestCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showCameraError('Camera API Unavailable',
+      'Your browser does not support camera access, or this page is not served via localhost/HTTPS. ' +
+      'Run: python -m http.server 8080 in the frontend folder, then open http://localhost:8080/session.html');
+    return;
+  }
+  const btn = document.querySelector('#state-requesting .cam-req-btn');
+  if (btn) { btn.textContent = 'Connecting…'; btn.disabled = true; }
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+      audio: false,
+    });
+    const video = document.getElementById('videoFeed');
+    video.srcObject = stream;
+    video.style.display = 'block';
+    video.onloadedmetadata = () => {
+      video.play().catch(() => {});
+      onCameraReady();
+    };
+  } catch (err) {
+    let hint = '';
+    if (err.name === 'NotAllowedError')   hint = 'Permission denied. Click the camera icon in your address bar, set to "Allow", then retry.';
+    else if (err.name === 'NotFoundError')  hint = 'No camera found. Make sure a webcam is connected and not used by another app.';
+    else if (err.name === 'NotReadableError') hint = 'Camera is in use by another app (Zoom, Teams, etc.). Close it and retry.';
+    else if (location.protocol === 'file:')  hint = 'Camera requires localhost. Run: python -m http.server 8080, then open http://localhost:8080/session.html';
+    else hint = err.name + ': ' + err.message;
+    showCameraError('Camera Access Failed', hint);
+  }
+}
+
+function showCameraError(title, hint) {
+  document.getElementById('state-requesting').style.display = 'none';
+  const d = document.getElementById('state-denied');
+  d.style.display = 'flex';
+  d.querySelector('.cam-state-title').textContent = title;
+  d.querySelector('.cam-state-sub').textContent   = hint;
+  document.getElementById('ctrl-note').textContent = 'No camera — sessions still work without engagement tracking.';
+  const btn = d.querySelector('.cam-req-btn');
+  if (btn) { btn.textContent = 'Retry'; btn.disabled = false; }
+}
+
+function onCameraReady() {
+  cameraReady = true;
+  document.getElementById('state-requesting').style.display = 'none';
+  document.getElementById('state-denied').style.display     = 'none';
+  document.getElementById('liveOverlays').style.display     = 'block';
+  document.getElementById('ctrl-note').textContent = 'Camera active. Connecting to CV server…';
+
+  // Enable PiP button once camera is live
+  const pipBtn = document.getElementById('pipBtn');
+  if (pipBtn && 'pictureInPictureEnabled' in document) {
+    pipBtn.disabled = false;
+  } else if (pipBtn) {
+    pipBtn.style.display = 'none'; // hide if browser doesn't support PiP
+  }
+
+  connectCVServer();
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  cameraReady = false;
+  stopCVServer();
+  document.getElementById('videoFeed').style.display      = 'none';
+  document.getElementById('liveOverlays').style.display   = 'none';
+  document.getElementById('state-requesting').style.display = 'flex';
+}
+
+/* ════════════════════════════════════════
+   CV WEBSOCKET
+   Connects to ws://localhost:8001
+   Sends JPEG frames at 5fps
+   Receives real MediaPipe metrics
+════════════════════════════════════════ */
+const CV_WS_URL = 'ws://localhost:8001';
+
+function connectCVServer() {
+  if (cvSocket && cvSocket.readyState === WebSocket.OPEN) return;
+
+  try {
+    cvSocket = new WebSocket(CV_WS_URL);
+
+    cvSocket.onopen = () => {
+      cvConnected = true;
+      clearTimeout(cvRetryTimeout);
+      document.getElementById('ctrl-note').textContent =
+        'Camera + CV active. Set up your session and press Start.';
+      addAlert('info', 'MediaPipe CV server connected. Real signal detection active.', '🧠');
+      startFrameSender();
+    };
+
+    cvSocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.error) return;
+
+        // Update live signals from real MediaPipe data
+        live.faceDetected = data.face_detected;
+        if (data.face_detected) {
+          live.eyeOpenness = data.eye_openness;
+          live.blinkRate   = data.blink_rate;
+          live.headMotion  = data.head_motion;
+          live.stillSec    = data.inactivity_sec;
+        }
+
+        // Update motion indicator
+        const isMoving = live.headMotion > 5;
+        document.getElementById('motionDot').className    = 'motion-indicator' + (isMoving ? ' active' : '');
+        document.getElementById('motionLabel').textContent = isMoving ? 'Motion' : 'Still';
+
+        // Head pose alerts (yaw = looking left/right, pitch = looking down)
+        if (data.head_pose && sessionActive && !sessionPaused) {
+          const { pitch, yaw } = data.head_pose;
+          const now = Date.now();
+          if (Math.abs(yaw) > 25 && (now - lastDistractionToast) > 30000) {
+            lastDistractionToast = now;
+            showToast('warn', '👀 Looking away', 'Head turned away from screen.');
+          }
+          if (pitch > 20 && (now - lastDistractionToast) > 30000) {
+            lastDistractionToast = now;
+            showToast('warn', '😪 Head drooping', 'Possible fatigue — head tilting down.');
+          }
+        }
+
+        // Update signal cards (every frame for smooth UI)
+        if (sessionActive && !sessionPaused && data.face_detected) {
+          updateSignalDisplay(live.eyeOpenness, live.headMotion, live.stillSec);
+        }
+
+        // Blink display: only update every 5 seconds to avoid spam
+        if (sessionActive && !sessionPaused) {
+          const now = Date.now();
+          if (!window._lastBlinkUpdate || now - window._lastBlinkUpdate > 5000) {
+            window._lastBlinkUpdate = now;
+            updateBlinkDisplay(live.blinkRate);
+          }
+        }
+
+        // No face warning — max once per 20 seconds
+        if (!data.face_detected && sessionActive && !sessionPaused) {
+          const now = Date.now();
+          if (!window._lastNoFace || now - window._lastNoFace > 20000) {
+            window._lastNoFace = now;
+            showToast('warn', '👤 No face detected', 'Make sure your face is visible to the camera.');
+          }
+        }
+
+      } catch (e) {
+        console.warn('CV parse error:', e);
+      }
+    };
+
+    cvSocket.onclose = () => {
+      cvConnected = false;
+      stopFrameSender();
+      // Try to reconnect after 3 seconds
+      cvRetryTimeout = setTimeout(() => {
+        if (cameraReady) {
+          console.log('[CV] Reconnecting…');
+          connectCVServer();
+        }
+      }, 3000);
+    };
+
+    cvSocket.onerror = () => {
+      cvConnected = false;
+      // Fall back to canvas mode if CV server not available
+      document.getElementById('ctrl-note').textContent =
+        'CV server not found — falling back to basic tracking. Start cv_server.py for real detection.';
+      startCanvasFallback();
+    };
+
+  } catch (e) {
+    console.warn('CV WebSocket failed:', e);
+    startCanvasFallback();
+  }
+}
+
+function stopCVServer() {
+  stopFrameSender();
+  if (cvSocket) { cvSocket.close(); cvSocket = null; }
+  cvConnected = false;
+  clearTimeout(cvRetryTimeout);
+}
+
+function startFrameSender() {
+  stopFrameSender();
+  const video  = document.getElementById('videoFeed');
+  const canvas = document.getElementById('analysisCanvas');
+  const ctx    = canvas.getContext('2d');
+
+  // Send at 5fps — 320×240 is enough for MediaPipe, keeps bandwidth low
+  canvas.width  = 320;
+  canvas.height = 240;
+
+  cvFrameIv = setInterval(() => {
+    if (!cvConnected || !cameraReady || video.readyState < 2) return;
+    if (cvSocket.readyState !== WebSocket.OPEN) return;
+
+    ctx.drawImage(video, 0, 0, 320, 240);
+    // Convert canvas to JPEG base64 (quality 0.7 = good balance)
+    const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+    cvSocket.send(dataURL);
+  }, 200); // 5fps
+}
+
+function stopFrameSender() {
+  clearInterval(cvFrameIv);
+  cvFrameIv = null;
+}
+
+/* ════════════════════════════════════════
+   CANVAS FALLBACK
+   Used automatically if CV server is
+   not running. Keeps the app working.
+════════════════════════════════════════ */
+function startCanvasFallback() {
+  const video  = document.getElementById('videoFeed');
+  const canvas = document.getElementById('analysisCanvas');
+  const ctx    = canvas.getContext('2d');
+  const W = 160, H = 120;
+  canvas.width = W; canvas.height = H;
+
+  let prevPixels = null, blinkHist = [], blinkCnt = 0,
+      blinkWin = Date.now(), lastMoveTime = Date.now();
+
+  analysisIv = setInterval(() => {
+    if (!cameraReady || video.readyState < 2) return;
+    ctx.drawImage(video, 0, 0, W, H);
+    const pixels = ctx.getImageData(0, 0, W, H).data;
+
+    // Brightness → eye openness proxy
+    let brightness = 0, count = 0;
+    for (let y = Math.floor(H*0.25); y < Math.floor(H*0.55); y++) {
+      for (let x = Math.floor(W*0.25); x < Math.floor(W*0.75); x++) {
+        const i = (y*W+x)*4;
+        brightness += pixels[i]*0.299 + pixels[i+1]*0.587 + pixels[i+2]*0.114;
+        count++;
+      }
+    }
+    brightness /= count;
+
+    // Blink
+    blinkHist.push(brightness);
+    if (blinkHist.length > 6) blinkHist.shift();
+    const avgB = blinkHist.reduce((a,b)=>a+b,0)/blinkHist.length;
+    if (avgB - brightness > 18 && blinkHist.length >= 4) { blinkCnt++; blinkHist = []; }
+    if (Date.now() - blinkWin > 15000) {
+      live.blinkRate = Math.round((blinkCnt/15)*60);
+      blinkCnt = 0; blinkWin = Date.now();
+      updateBlinkDisplay(live.blinkRate);
+    }
+
+    // Motion
+    let motion = 0;
+    if (prevPixels) {
+      let diff = 0;
+      for (let i = 0; i < pixels.length; i += 16)
+        diff += Math.abs(pixels[i]-prevPixels[i]) + Math.abs(pixels[i+1]-prevPixels[i+1]) + Math.abs(pixels[i+2]-prevPixels[i+2]);
+      motion = diff / (pixels.length/16*3);
+    }
+    prevPixels = new Uint8ClampedArray(pixels);
+
+    const isMoving = motion > 4.5;
+    document.getElementById('motionDot').className    = 'motion-indicator' + (isMoving?' active':'');
+    document.getElementById('motionLabel').textContent = isMoving ? 'Motion' : 'Still';
+    if (isMoving) lastMoveTime = Date.now();
+
+    live.eyeOpenness = Math.min(100, Math.max(10, Math.round((brightness/180)*100)));
+    live.headMotion  = Math.min(100, Math.round(motion*3));
+    live.stillSec    = Math.floor((Date.now()-lastMoveTime)/1000);
+
+    if (sessionActive && !sessionPaused)
+      updateSignalDisplay(live.eyeOpenness, live.headMotion, live.stillSec);
+  }, 200);
+}
+
+/* ════════════════════════════════════════
+   METRICS POSTER
+   Every 2 seconds → POST /sessions/{id}/metrics
+   Backend returns server-computed focus_score,
+   fatigue_index, and optional alert message.
+════════════════════════════════════════ */
+function startMetricsPoster() {
+  metricsIv = setInterval(async () => {
+    if (!sessionActive || sessionPaused) return;
+    const sessionId = localStorage.getItem('session_id');
+    if (!sessionId) return;
+
+    try {
+      const result = await api(`/sessions/${sessionId}/metrics`, 'POST', {
+        eye_openness:   live.eyeOpenness,
+        blink_rate:     live.blinkRate,
+        head_motion:    live.headMotion,
+        inactivity_sec: live.stillSec,
+      });
+
+      // Use server-computed focus score for the ring
+      updateRing(Math.round(result.focus_score));
+      live.focusScore   = result.focus_score;
+      live.fatigueIndex = result.fatigue_index;
+      focusScoreHistory.push(result.focus_score);
+      if (focusScoreHistory.length > 30) focusScoreHistory.shift();
+
+      // Show server alert if present
+      if (result.alert) {
+        handleServerAlert(result.alert);
+      }
+
+    } catch (err) {
+      // Silently fail — don't interrupt the session for a missed tick
+      console.warn('Metrics post failed:', err.message);
+    }
+  }, 2000);
+}
+
+function stopMetricsPoster() {
+  clearInterval(metricsIv);
+  metricsIv = null;
+}
+
+function handleServerAlert(alert) {
+  if (!alert) return;
+
+  // alert is now a dict: {title, body, action, type, duration_hint?}
+  // Handle both old string format and new dict format
+  if (typeof alert === 'string') {
+    showToast('warn', '⚠ Nexora', alert);
+    addAlert('warn', alert, '⚠');
+    return;
+  }
+
+  const { title, body, action, type, duration_hint } = alert;
+  const now = Date.now();
+
+  // Cooldown — don't show same type more than once per 3 minutes
+  const cooldownKey = '_alert_cooldown_' + type;
+  if (window[cooldownKey] && (now - window[cooldownKey]) < 180000) return;
+  window[cooldownKey] = now;
+
+  // Choose styling based on type
+  const toastType = type === 'break' ? 'good' : type === 'warning' ? 'bad' : 'warn';
+  const icon      = type === 'break' ? '☕' : type === 'warning' ? '⚠' : 'ℹ';
+
+  // Show rich toast with title + body
+  showRichToast(toastType, icon, title, body, action, duration_hint);
+
+  // Add to alerts log with full detail
+  addAlert(
+    type === 'break' ? 'info' : type === 'warning' ? 'bad' : 'warn',
+    `${body} → ${action}`,
+    icon
+  );
+}
+
+function showRichToast(type, icon, title, body, action, durationHint) {
+  const container = document.getElementById('toastContainer');
+  const toast     = document.createElement('div');
+  toast.className = `toast t-${type}`;
+  toast.style.maxWidth = '320px';
+
+  const breakTimer = durationHint
+    ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);
+                   font-size:10px;color:var(--accent);display:flex;align-items:center;gap:6px;">
+         <span>⏱</span> Suggested break: ${durationHint} minutes
+       </div>`
+    : '';
+
+  toast.innerHTML = `
+    <div class="toast-icon" style="font-size:18px;margin-top:2px;">${icon}</div>
+    <div class="toast-body" style="flex:1;">
+      <div class="toast-title" style="font-size:13px;margin-bottom:4px;">${title}</div>
+      <div style="color:var(--muted2);font-size:11px;line-height:1.5;">${body}</div>
+      <div style="color:var(--accent2);font-size:11px;margin-top:5px;line-height:1.4;">
+        → ${action}
+      </div>
+      ${breakTimer}
+    </div>
+    <button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
+
+  container.appendChild(toast);
+
+  // Break alerts stay longer (12s), others 8s
+  const duration = type === 'good' ? 12000 : 8000;
+  setTimeout(() => {
+    if (toast.parentElement) {
+      toast.style.animation = 'toastOut 0.3s ease forwards';
+      setTimeout(() => toast.remove(), 300);
+    }
+  }, duration);
+}
+
+/* ════════════════════════════════════════
+   SIGNAL DISPLAY HELPERS
+════════════════════════════════════════ */
+
+// Warmup timer — don't show blink alerts for first 35 seconds
+let sessionStartTime = null;
+let lastBlinkToast   = 0;
+
+function updateBlinkDisplay(rate) {
+  if (!sessionActive || sessionPaused) return;
+
+  // Skip display if rate is 0 — CV server still warming up
+  if (rate === 0) {
+    document.getElementById('sig-blink').textContent = 'Calibrating…';
+    document.getElementById('sig-blink').style.color = 'var(--muted)';
+    document.getElementById('bar-blink').style.width = '0%';
+    document.getElementById('card-blink').className  = 'sig-card';
+    return;
+  }
+
+  const pct   = Math.min(100, Math.round(rate / 30 * 100));
+  const state = rate > 22 || rate < 8 ? 'warn' : 'ok';
+  const color = rate > 22 ? 'var(--warn)' : rate < 8 ? 'var(--accent2)' : 'var(--text)';
+  document.getElementById('sig-blink').textContent      = rate + '/min';
+  document.getElementById('sig-blink').style.color      = color;
+  document.getElementById('bar-blink').style.width      = pct + '%';
+  document.getElementById('bar-blink').style.background = state === 'warn' ? 'var(--warn)' : 'var(--accent2)';
+  document.getElementById('card-blink').className       = 'sig-card ' + state;
+
+  // Only alert after 35s warmup AND cooldown of 3 minutes between alerts
+  const now        = Date.now();
+  const elapsed    = sessionStartTime ? (now - sessionStartTime) / 1000 : 0;
+  const cooldownOk = (now - lastBlinkToast) > 180000; // 3 min cooldown
+
+  if (elapsed > 35 && cooldownOk) {
+    if (rate > 24) {
+      lastBlinkToast = now;
+      showToast('warn', '👁 High blink rate', 'Possible eye strain. Look 20 feet away for 20 seconds.');
+    }
+    if (rate < 6) {
+      lastBlinkToast = now;
+      showToast('warn', '😶 Very low blink rate', 'Blink more to prevent eye strain.');
+    }
+  }
+}
+
+function updateSignalDisplay(eyeOpen, motionPct, stillSec) {
+  // Eye
+  const eyeState = eyeOpen < 40 ? 'bad' : eyeOpen < 60 ? 'warn' : 'ok';
+  document.getElementById('sig-eye').textContent         = eyeOpen + '%';
+  document.getElementById('sig-eye').style.color         = eyeOpen < 40 ? 'var(--danger)' : eyeOpen < 60 ? 'var(--warn)' : 'var(--text)';
+  document.getElementById('bar-eye').style.width         = eyeOpen + '%';
+  document.getElementById('bar-eye').style.background    = eyeOpen < 45 ? 'var(--danger)' : 'var(--accent)';
+  document.getElementById('card-eye').className          = 'sig-card ' + eyeState;
+
+  // Motion
+  const motionState = motionPct > 60 ? 'warn' : motionPct < 8 ? 'bad' : 'ok';
+  document.getElementById('sig-motion').textContent      = motionPct > 60 ? 'High' : motionPct < 8 ? 'None' : 'Normal';
+  document.getElementById('sig-motion').style.color      = motionState === 'ok' ? 'var(--text)' : 'var(--warn)';
+  document.getElementById('bar-motion').style.width      = motionPct + '%';
+  document.getElementById('card-motion').className       = 'sig-card ' + motionState;
+
+  // Still time
+  const stillState = stillSec > 90 ? 'bad' : stillSec > 45 ? 'warn' : 'ok';
+  const stillLabel = stillSec > 60 ? `${stillSec}s still` : stillSec > 0 ? `${stillSec}s` : 'Active';
+  document.getElementById('sig-inact').textContent       = stillLabel;
+  document.getElementById('sig-inact').style.color       = stillState === 'bad' ? 'var(--danger)' : stillState === 'warn' ? 'var(--warn)' : 'var(--text)';
+  document.getElementById('bar-inact').style.width       = Math.min(100, Math.round((stillSec / 120) * 100)) + '%';
+  document.getElementById('card-inact').className        = 'sig-card ' + stillState;
+
+  // Local notifications (frontend-only, fast)
+  checkLocalNotify(eyeOpen, stillSec);
+}
+
+function checkLocalNotify(eyeOpen, stillSec) {
+  const now = Date.now();
+  if (eyeOpen < 35 && (now - lastDistractionToast) > 90000) {
+    lastDistractionToast = now;
+    showToast('bad', '😴 Are you awake?', 'Very low eye openness detected. You might be getting drowsy.');
+    addAlert('bad', 'Very low eye openness — possible drowsiness.', '😴');
+  }
+  if (stillSec > 100 && (now - lastDistractionToast) > 100000) {
+    lastDistractionToast = now;
+    showToast('warn', '🧊 No movement', 'You\'ve been still for a while. Still studying?');
+    addAlert('warn', 'Extended stillness detected.', '🧊');
+  }
+}
+
+/* ════════════════════════════════════════
+   BREAK REMINDER SYSTEM (every 25 min)
+════════════════════════════════════════ */
+function startBreakReminders() {
+  breakReminderIv = setInterval(() => {
+    if (!sessionActive || sessionPaused) return;
+    const minutes = Math.floor(getElapsed() / 60);
+
+    if (minutes === 10) showToast('good', '✅ 10 minutes in!', 'Great start. Keep the momentum going.');
+    if (minutes === 20) showToast('good', '🔥 20 minutes focused!', 'You\'re building solid study momentum.');
+
+    if (minutes > 0 && minutes % 25 === 0 && (Date.now() - lastBreakPopupTime) > 20 * 60000) {
+      lastBreakPopupTime = Date.now();
+      showBreakPopup(minutes);
+    }
+
+    const avgFocus = focusScoreHistory.length > 0
+      ? focusScoreHistory.reduce((a, b) => a + b, 0) / focusScoreHistory.length : 100;
+    if (avgFocus < 38 && focusScoreHistory.length >= 10 && (Date.now() - lastBreakPopupTime) > 10 * 60000) {
+      lastBreakPopupTime = Date.now();
+      showDistractionPopup();
+    }
+  }, 60000);
+}
+
+function stopBreakReminders() {
+  clearInterval(breakReminderIv);
+  breakReminderIv = null;
+}
+
+/* ════════════════════════════════════════
+   POPUP SYSTEM
+════════════════════════════════════════ */
+function showBreakPopup(minutesStudied) {
+  document.getElementById('popupBox').className     = 'popup-box break';
+  document.getElementById('popupIcon').textContent  = '☕';
+  document.getElementById('popupTitle').textContent = `${minutesStudied} Minutes — Take a Break`;
+  document.getElementById('popupMsg').textContent   = "You've been studying continuously. A 5–15 minute break improves retention and re-energises focus.";
+
+  const timerRing = document.getElementById('popupTimerRing');
+  timerRing.style.display = 'flex';
+  let breakSeconds = 15 * 60;
+  updateBreakTimer(breakSeconds);
+  clearInterval(breakTimerIv);
+  breakTimerIv = setInterval(() => {
+    breakSeconds--;
+    updateBreakTimer(breakSeconds);
+    if (breakSeconds <= 0) {
+      clearInterval(breakTimerIv);
+      document.getElementById('popupTitle').textContent = 'Break Over — Back to Work!';
+      document.getElementById('popupPrimary').textContent = 'Resume Session';
+    }
+  }, 1000);
+
+  document.getElementById('popupPrimary').textContent  = 'Start Break';
+  document.getElementById('popupPrimary').onclick      = () => { addAlert('info', 'Break started.', '☕'); dismissPopup(); };
+  document.getElementById('popupSecondary').style.display = 'inline-block';
+  document.getElementById('popupSecondary').textContent   = 'Keep Studying';
+  document.getElementById('popupSecondary').onclick       = () => { addAlert('info', 'Break skipped.', '▶'); dismissPopup(); };
+
+  document.getElementById('popup').classList.add('show');
+  addAlert('info', `${minutesStudied}-minute milestone. Break recommended.`, '☕');
+}
+
+function showDistractionPopup() {
+  document.getElementById('popupBox').className     = 'popup-box distracted';
+  document.getElementById('popupTimerRing').style.display = 'none';
+  document.getElementById('popupIcon').textContent  = '🎯';
+  document.getElementById('popupTitle').textContent = 'Regain Your Focus';
+  document.getElementById('popupMsg').innerHTML     =
+    `Focus has been consistently low.<br/><br/><strong>→</strong> Phone face-down<br/><strong>→</strong> Close unrelated tabs<br/><strong>→</strong> Take 3 deep breaths`;
+  document.getElementById('popupPrimary').textContent  = "I'm Refocused";
+  document.getElementById('popupPrimary').onclick      = () => { focusScoreHistory = []; showToast('good', '🎯 Refocused!', "Back to it."); dismissPopup(); };
+  document.getElementById('popupSecondary').style.display = 'none';
+  document.getElementById('popup').classList.add('show');
+}
+
+function dismissPopup() {
+  clearInterval(breakTimerIv);
+  document.getElementById('popup').classList.remove('show');
+}
+
+function updateBreakTimer(seconds) {
+  const mins = Math.floor(seconds / 60), secs = seconds % 60;
+  document.getElementById('ptLabel').textContent = `${pad(mins)}:${pad(secs)}`;
+  document.getElementById('ptFill').style.strokeDashoffset = 188 * (1 - seconds / (15 * 60));
+}
+
+document.getElementById('popup').addEventListener('click', function(e) {
+  if (e.target === this) dismissPopup();
+});
+
+/* ════════════════════════════════════════
+   TOAST NOTIFICATIONS
+════════════════════════════════════════ */
+function showToast(type, title, msg) {
+  const toast = document.createElement('div');
+  toast.className = `toast t-${type}`;
+  toast.innerHTML = `
+    <div class="toast-icon">${type === 'good' ? '✅' : type === 'bad' ? '🚨' : '⚠'}</div>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      <div style="color:var(--muted2)">${msg}</div>
+    </div>
+    <button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
+  document.getElementById('toastContainer').appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'toastOut 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 6000);
+}
+
+/* ════════════════════════════════════════
+   FOCUS RING
+════════════════════════════════════════ */
+function updateRing(score) {
+  const fill = document.getElementById('ringFill');
+  const svg  = document.querySelector('.ring-svg');
+  const num  = document.getElementById('ringScore');
+
+  fill.style.strokeDashoffset = 298 - (score / 100) * 298;
+
+  // Color + glow based on score
+  if (score > 70) {
+    fill.style.stroke = 'var(--accent)';
+    svg.className     = 'ring-svg glow-green';
+    num.style.color   = 'var(--accent)';
+    fill.classList.add('pulsing');
+  } else if (score > 45) {
+    fill.style.stroke = 'var(--warn)';
+    svg.className     = 'ring-svg glow-warn';
+    num.style.color   = 'var(--warn)';
+    fill.classList.remove('pulsing');
+  } else {
+    fill.style.stroke = 'var(--danger)';
+    svg.className     = 'ring-svg glow-danger';
+    num.style.color   = 'var(--danger)';
+    fill.classList.remove('pulsing');
+  }
+
+  document.getElementById('ringScore').textContent = score;
+  const states = ['Distracted', 'Low Focus', 'Moderate', 'Focused', 'Deep Focus'];
+  const statusEl = document.getElementById('ringStatus');
+  statusEl.textContent = states[Math.min(4, Math.floor(score / 22))];
+  statusEl.style.color = score > 70 ? 'var(--accent)' : score > 45 ? 'var(--warn)' : 'var(--danger)';
+}
+
+/* ════════════════════════════════════════
+   ALERTS LOG
+════════════════════════════════════════ */
+function addAlert(type, msg, icon) {
+  const noEl = document.getElementById('noAlerts');
+  if (noEl) noEl.remove();
+  const count = document.getElementById('alert-count');
+  count.textContent = parseInt(count.textContent || 0) + 1;
+  const el  = document.createElement('div');
+  el.className = `alert-item a-${type}`;
+  el.innerHTML = `<div class="a-icon">${icon}</div><div><div>${msg}</div><div class="a-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div></div>`;
+  document.getElementById('alertsList').prepend(el);
+  const items = document.querySelectorAll('.alert-item');
+  if (items.length > 10) items[items.length - 1].remove();
+}
+
+/* ════════════════════════════════════════
+   BUTTON HELPER
+════════════════════════════════════════ */
+function setBtn(id, cls, txt, dis) {
+  const b = document.getElementById(id);
+  b.className = 'ctrl-btn ' + cls;
+  b.textContent = txt;
+  b.disabled = dis;
+}
+
+function resetSignalCards() {
+  ['eye', 'blink', 'motion', 'inact'].forEach(id => {
+    document.getElementById('sig-' + id).textContent   = '—';
+    document.getElementById('sig-' + id).style.color   = 'var(--muted)';
+    document.getElementById('bar-' + id).style.width   = '0%';
+    document.getElementById('card-' + id).className    = 'sig-card';
+  });
+}
+
+/* ════════════════════════════════════════
+   SESSION CONTROLS
+   All async — each calls the backend then
+   updates UI only on success.
+════════════════════════════════════════ */
+
+// ── START ──────────────────────────────
+async function startSession() {
+  const topic    = document.getElementById('topicInput').value.trim()    || 'General Study';
+  const goal     = document.getElementById('goalInput').value.trim()     || null;
+  const duration = parseInt(document.getElementById('durationSelect').value) || null;
+
+  // Disable button immediately to prevent double-click
+  setBtn('btnStart', 'c-off', '▶ Starting…', true);
+
+  try {
+    const data = await api('/sessions/start', 'POST', {
+      topic,
+      goal,
+      planned_duration_min: duration,
+    });
+
+    // Store session_id for all subsequent calls
+    localStorage.setItem('session_id', data.session_id);
+
+    // Update UI
+    const firstName = (localStorage.getItem('name') || 'Student').split(' ')[0];
+    document.getElementById('session-label').textContent = topic;
+    document.getElementById('status-pill').textContent   = 'Active';
+    document.getElementById('status-pill').className     = 'status-pill s-active';
+
+    sessionActive = true;
+    sessionPaused = false;
+    sessionStart  = Date.now();
+    sessionStartTime = Date.now();   // for blink alert warmup
+    pausedElapsed = 0;
+
+    // Visual polish
+    document.querySelector('.topbar').classList.add('session-active');
+    document.querySelector('.ctrl-bar').classList.add('active');
+
+    timerIv = setInterval(updateTimer, 1000);
+    startBreakReminders();
+    startMetricsPoster();       // ← begin posting metrics every 2s
+
+    setBtn('btnStart', 'c-off',   '▶ Start Session', true);
+    setBtn('btnPause', 'c-pause', '⏸ Pause',         false);
+    setBtn('btnEnd',   'c-end',   '■ End & Save',     false);
+    document.getElementById('ctrl-note').textContent = 'Session running — Nexora is tracking your engagement.';
+
+    if (!cameraReady) showToast('warn', '📷 No camera', 'Engagement tracking unavailable without camera.');
+    addAlert('info', `Session started: "${topic}". ${cameraReady ? 'Camera tracking active.' : 'No camera.'}`, '▶');
+
+  } catch (err) {
+    setBtn('btnStart', 'c-start', '▶ Start Session', false);
+    showToast('bad', '❌ Could not start session', err.message);
+  }
+}
+
+// ── PAUSE / RESUME ─────────────────────
+async function togglePause() {
+  if (!sessionActive) return;
+  const sessionId = localStorage.getItem('session_id');
+
+  if (!sessionPaused) {
+    // ── Pausing ──
+    try {
+      await api(`/sessions/${sessionId}/pause`, 'POST');
+
+      pausedElapsed += Math.floor((Date.now() - sessionStart) / 1000);
+      sessionStart   = null;
+      sessionPaused  = true;
+
+      document.getElementById('status-pill').textContent = 'Paused';
+      document.getElementById('status-pill').className   = 'status-pill s-paused';
+      setBtn('btnPause', 'c-pause', '▶ Resume', false);
+      document.getElementById('ctrl-note').textContent = 'Session paused.';
+      addAlert('info', 'Session paused.', '⏸');
+
+    } catch (err) {
+      showToast('bad', '❌ Could not pause', err.message);
+    }
+
+  } else {
+    // ── Resuming ──
+    try {
+      await api(`/sessions/${sessionId}/resume`, 'POST');
+
+      sessionStart  = Date.now();
+      sessionPaused = false;
+
+      document.getElementById('status-pill').textContent = 'Active';
+      document.getElementById('status-pill').className   = 'status-pill s-active';
+      setBtn('btnPause', 'c-pause', '⏸ Pause', false);
+      document.getElementById('ctrl-note').textContent = 'Session resumed.';
+      addAlert('info', 'Session resumed.', '▶');
+
+    } catch (err) {
+      showToast('bad', '❌ Could not resume', err.message);
+    }
+  }
+}
+
+// ── END ────────────────────────────────
+async function endSession() {
+  if (!confirm('End and save this session?')) return;
+  const sessionId = localStorage.getItem('session_id');
+
+  setBtn('btnEnd', 'c-off', '■ Saving…', true);
+
+  try {
+    const summary = await api(`/sessions/${sessionId}/end`, 'POST');
+
+    // All cleanup
+    clearInterval(timerIv);
+    stopBreakReminders();
+    stopMetricsPoster();
+    dismissPopup();
+
+    sessionActive = false;
+    sessionPaused = false;
+
+    document.getElementById('status-pill').textContent = 'Saved';
+    document.getElementById('status-pill').className   = 'status-pill s-idle';
+    setBtn('btnPause', 'c-off',   '⏸ Pause',        true);
+    setBtn('btnEnd',   'c-off',   '■ End & Save',    true);
+    setBtn('btnStart', 'c-start', '▶ New Session',   false);
+    document.getElementById('ctrl-note').textContent = 'Session saved. Redirecting to quiz…';
+
+    resetSignalCards();
+
+    // Show final summary in alert log
+    if (summary.avg_focus_score) {
+      addAlert('info', `Session complete. Avg focus: ${summary.avg_focus_score}%. Duration: ${Math.round(summary.duration_seconds / 60)} min.`, '✅');
+    }
+
+    setTimeout(() => { window.location.href = 'quiz.html'; }, 1800);
+
+  } catch (err) {
+    setBtn('btnEnd', 'c-end', '■ End & Save', false);
+    showToast('bad', '❌ Could not save session', err.message);
+  }
+}
+
+/* ════════════════════════════════════════
+   PICTURE IN PICTURE
+   Composites focus score + signals onto
+   a canvas stream so the student can
+   float the monitor over any other window.
+════════════════════════════════════════ */
+let pipVideoEl  = null;   // the <video> element used for PiP
+let pipDrawIv   = null;   // interval that redraws the overlay
+let isPiPActive = false;
+
+async function togglePiP() {
+  if (isPiPActive) {
+    exitPiP();
+  } else {
+    await enterPiP();
+  }
+}
+
+async function enterPiP() {
+  if (!cameraReady) {
+    showToast('warn', '📷 Camera needed', 'Enable camera first to use the floating monitor.');
+    return;
+  }
+
+  try {
+    const pipCanvas = document.getElementById('pipCanvas');
+    const ctx       = pipCanvas.getContext('2d');
+    const video     = document.getElementById('videoFeed');
+
+    // Draw loop — composites camera + overlay onto pipCanvas at 10fps
+    pipDrawIv = setInterval(() => drawPiPFrame(ctx, video), 100);
+
+    // Capture the canvas as a video stream
+    const stream   = pipCanvas.captureStream(10);
+    pipVideoEl     = document.createElement('video');
+    pipVideoEl.srcObject = stream;
+    pipVideoEl.muted     = true;
+    await pipVideoEl.play();
+
+    // Enter PiP
+    await pipVideoEl.requestPictureInPicture();
+    isPiPActive = true;
+
+    const btn = document.getElementById('pipBtn');
+    btn.textContent = '⧉ Exit Float';
+    btn.classList.add('active');
+
+    // Listen for user closing PiP via browser UI
+    pipVideoEl.addEventListener('leavepictureinpicture', () => {
+      isPiPActive = false;
+      clearInterval(pipDrawIv);
+      const b = document.getElementById('pipBtn');
+      if (b) { b.textContent = '⧉ Float Monitor'; b.classList.remove('active'); }
+    });
+
+  } catch (err) {
+    console.warn('PiP error:', err);
+    showToast('warn', '⧉ PiP unavailable', 'Your browser may not support Picture in Picture. Try Chrome.');
+  }
+}
+
+function exitPiP() {
+  if (document.pictureInPictureElement) {
+    document.exitPictureInPicture();
+  }
+  clearInterval(pipDrawIv);
+  isPiPActive = false;
+  const btn = document.getElementById('pipBtn');
+  if (btn) { btn.textContent = '⧉ Float Monitor'; btn.classList.remove('active'); }
+}
+
+function drawPiPFrame(ctx, video) {
+  const W = 640, H = 360;
+
+  // 1. Draw camera feed (mirrored like the main video)
+  if (video && video.readyState >= 2) {
+    ctx.save();
+    ctx.translate(W, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, W, H);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#0b0c0f';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // 2. Semi-transparent overlay panel on the right side
+  ctx.fillStyle = 'rgba(11,12,15,0.82)';
+  ctx.beginPath();
+  roundRect(ctx, W - 160, 10, 150, 200, 10);
+  ctx.fill();
+
+  const score   = parseInt(document.getElementById('ringScore').textContent)  || 0;
+  const status  = document.getElementById('ringStatus').textContent            || '—';
+  const elapsed = document.getElementById('timer').textContent                 || '00:00:00';
+  const topic   = document.getElementById('session-label').textContent         || 'No session';
+
+  // 3. Focus score (big number)
+  const scoreColor = score > 70 ? '#c8f04d' : score > 45 ? '#f09d4d' : '#f04d7a';
+  ctx.font         = 'bold 42px Syne, sans-serif';
+  ctx.fillStyle    = scoreColor;
+  ctx.textAlign    = 'center';
+  ctx.fillText(score, W - 85, 72);
+
+  ctx.font      = '11px DM Mono, monospace';
+  ctx.fillStyle = '#6b7280';
+  ctx.fillText('FOCUS', W - 85, 90);
+
+  // 4. Status text
+  ctx.font      = '10px DM Mono, monospace';
+  ctx.fillStyle = '#9ca3af';
+  ctx.fillText(status, W - 85, 112);
+
+  // 5. Divider
+  ctx.strokeStyle = '#252830';
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.moveTo(W - 148, 122); ctx.lineTo(W - 22, 122);
+  ctx.stroke();
+
+  // 6. Timer
+  ctx.font      = 'bold 13px Syne, monospace';
+  ctx.fillStyle = '#e8eaf0';
+  ctx.fillText(elapsed, W - 85, 142);
+
+  // 7. Topic (truncated)
+  const shortTopic = topic.length > 16 ? topic.slice(0, 14) + '…' : topic;
+  ctx.font      = '9px DM Mono, monospace';
+  ctx.fillStyle = '#6b7280';
+  ctx.fillText(shortTopic, W - 85, 160);
+
+  // 8. Signal dots row
+  const eyeVal    = document.getElementById('sig-eye').textContent    || '—';
+  const blinkVal  = document.getElementById('sig-blink').textContent  || '—';
+  const motionVal = document.getElementById('sig-motion').textContent || '—';
+
+  ctx.font      = '9px DM Mono, monospace';
+  ctx.fillStyle = '#6b7280';
+  ctx.textAlign = 'left';
+
+  const col1 = W - 152, col2 = W - 90;
+  ctx.fillText('👁 ' + eyeVal,    col1, 185);
+  ctx.fillText('👤 ' + motionVal, col2, 185);
+  ctx.fillText('👀 ' + blinkVal,  col1, 200);
+
+  // 9. "Nexora" watermark bottom left
+  ctx.font      = 'bold 10px Syne, sans-serif';
+  ctx.fillStyle = 'rgba(200,240,77,0.5)';
+  ctx.textAlign = 'left';
+  ctx.fillText('● Nexora', 12, H - 12);
+
+  ctx.textAlign = 'left'; // reset
+}
+
+// Helper: rounded rectangle path
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+/* ════════════════════════════════════════
+   PANEL TABS (Alerts / Coach)
+════════════════════════════════════════ */
+function switchPanel(name, btn) {
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('pane-' + name).classList.add('active');
+}
+
+/* ════════════════════════════════════════
+   FOCUS COACH CHAT
+════════════════════════════════════════ */
+let coachHistory = [];
+
+async function sendCoachMessage() {
+  const input = document.getElementById('chatInput');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  document.getElementById('chatSendBtn').disabled = true;
+
+  // Add user bubble
+  appendChatBubble(msg, 'user');
+
+  // Show typing indicator
+  const typing = document.getElementById('chatTyping');
+  typing.style.display = 'block';
+
+  // Add to history
+  coachHistory.push({ role: 'user', content: msg });
+
+  try {
+    const res = await api('/chat/coach', 'POST', {
+      message:       msg,
+      topic:         document.getElementById('topicInput').value.trim() || 'General Study',
+      focus_score:   live.focusScore || 70,
+      fatigue_index: live.fatigueIndex || 20,
+      elapsed_min:   Math.floor(getElapsed() / 60),
+      history:       coachHistory.slice(-6),
+    });
+
+    typing.style.display = 'none';
+    appendChatBubble(res.reply, 'bot');
+    coachHistory.push({ role: 'assistant', content: res.reply });
+    if (coachHistory.length > 20) coachHistory = coachHistory.slice(-20);
+
+  } catch (err) {
+    typing.style.display = 'none';
+    appendChatBubble('Sorry, I could not connect right now. Make sure the backend is running.', 'bot');
+  }
+
+  document.getElementById('chatSendBtn').disabled = false;
+}
+
+function appendChatBubble(text, role) {
+  const container = document.getElementById('chatMessages');
+
+  // Remove empty state
+  const empty = container.querySelector('.chat-empty');
+  if (empty) empty.remove();
+
+  const bubble = document.createElement('div');
+  bubble.className = `chat-bubble ${role}`;
+  bubble.textContent = text;
+  container.appendChild(bubble);
+
+  // Auto-scroll to bottom
+  container.scrollTop = container.scrollHeight;
+}
+</script>
+</body>
+</html>

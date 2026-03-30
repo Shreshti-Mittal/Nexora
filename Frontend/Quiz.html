@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Nexora — Quiz</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0b0c0f;--surface:#13151a;--surface2:#1c1f27;
+  --border:#252830;--accent:#c8f04d;--accent2:#4df0c8;
+  --warn:#f09d4d;--danger:#f04d7a;
+  --text:#e8eaf0;--muted:#6b7280;--muted2:#9ca3af;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;font-size:14px;min-height:100vh;display:flex;flex-direction:column;}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.35;}
+
+/* NAV */
+nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:50;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:8px;}
+.logo-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+.nav-links{display:flex;gap:8px;}
+.nbtn{padding:8px 16px;border-radius:5px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text);text-decoration:none;transition:border-color 0.15s;display:inline-block;}
+.nbtn:hover{border-color:var(--muted);}
+.nbtn.accent{background:var(--accent);color:#0b0c0f;border-color:transparent;}
+.nbtn.accent:hover{opacity:0.88;}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:300px 1fr;flex:1;min-height:0;}
+
+/* SIDEBAR */
+.sidebar{border-right:1px solid var(--border);padding:20px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;}
+.panel-title{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;margin-bottom:12px;}
+.mode-tabs{display:flex;gap:2px;background:var(--surface2);border-radius:5px;padding:2px;margin-bottom:14px;}
+.mode-tab{flex:1;padding:7px;border-radius:3px;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all 0.15s;text-align:center;}
+.mode-tab.active{background:var(--surface);color:var(--text);}
+.f-field{margin-bottom:12px;}
+.f-field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:5px;}
+.f-field input,.f-field select,.f-field textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:9px 11px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;transition:border-color 0.2s;}
+.f-field input:focus,.f-field select:focus{border-color:rgba(200,240,77,0.4);}
+.f-field select option{background:var(--surface2);}
+.gen-btn{width:100%;padding:11px;border-radius:6px;background:var(--accent);color:#0b0c0f;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;border:none;cursor:pointer;transition:opacity 0.15s;letter-spacing:0.02em;}
+.gen-btn:hover{opacity:0.88;}
+.gen-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* Upload zone */
+.upload-zone{border:2px dashed var(--border);border-radius:8px;padding:24px;text-align:center;cursor:pointer;transition:border-color 0.2s;margin-bottom:12px;}
+.upload-zone:hover,.upload-zone.dragover{border-color:rgba(200,240,77,0.4);}
+.upload-zone-icon{font-size:28px;margin-bottom:8px;}
+.upload-zone-text{font-size:11px;color:var(--muted2);line-height:1.6;}
+.upload-zone-file{font-size:11px;color:var(--accent);margin-top:6px;}
+#fileInput{display:none;}
+
+/* MAIN CONTENT */
+.main{padding:24px;overflow-y:auto;display:flex;flex-direction:column;}
+
+/* States */
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);}
+.empty-icon{font-size:48px;opacity:0.3;}
+.empty-title{font-family:'Syne',sans-serif;font-weight:700;font-size:18px;color:var(--muted2);}
+.empty-sub{font-size:12px;text-align:center;max-width:300px;line-height:1.7;}
+
+/* Loading */
+.loading-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:var(--muted2);}
+.loading-sub{font-size:12px;color:var(--muted);}
+
+/* Quiz active */
+.quiz-header{margin-bottom:20px;}
+.quiz-topic{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;letter-spacing:-0.5px;margin-bottom:4px;}
+.quiz-meta{font-size:11px;color:var(--muted);}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;margin-top:12px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.4s ease;}
+
+.question-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:16px;}
+.q-num{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;}
+.q-text{font-family:'Instrument Serif',serif;font-style:italic;font-size:18px;line-height:1.5;margin-bottom:20px;color:var(--text);}
+.options{display:flex;flex-direction:column;gap:8px;}
+.option-btn{width:100%;text-align:left;padding:12px 16px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;cursor:pointer;transition:all 0.15s;display:flex;gap:12px;align-items:center;}
+.option-btn:hover:not(:disabled){border-color:rgba(200,240,77,0.4);background:rgba(200,240,77,0.04);}
+.option-btn.selected{border-color:rgba(200,240,77,0.5);background:rgba(200,240,77,0.06);}
+.option-btn.correct{border-color:rgba(200,240,77,0.6);background:rgba(200,240,77,0.08);color:var(--accent);}
+.option-btn.wrong{border-color:rgba(240,77,122,0.5);background:rgba(240,77,122,0.06);color:var(--danger);}
+.option-btn:disabled{cursor:default;}
+.opt-letter{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;min-width:20px;}
+.explanation{margin-top:14px;padding:12px;border-radius:6px;background:rgba(77,240,200,0.04);border:1px solid rgba(77,240,200,0.15);font-size:12px;color:var(--accent2);line-height:1.6;display:none;}
+.explanation.show{display:block;}
+
+.quiz-nav{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+.nav-btn{padding:10px 22px;border-radius:6px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;transition:all 0.15s;border:1px solid var(--border);background:var(--surface2);color:var(--text);}
+.nav-btn:hover{border-color:var(--muted);}
+.nav-btn.primary{background:var(--accent);color:#0b0c0f;border-color:transparent;}
+.nav-btn.primary:hover{opacity:0.88;}
+.nav-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.q-counter{font-size:12px;color:var(--muted);}
+
+/* Results */
+.results-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;text-align:center;margin-bottom:20px;}
+.score-ring{width:110px;height:110px;margin:0 auto 20px;position:relative;}
+.score-ring svg{transform:rotate(-90deg);}
+.score-bg{fill:none;stroke:var(--border);stroke-width:8;}
+.score-fill{fill:none;stroke-width:8;stroke-linecap:round;stroke-dasharray:298;stroke-dashoffset:298;transition:stroke-dashoffset 1s ease;}
+.score-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.score-num{font-family:'Syne',sans-serif;font-weight:800;font-size:26px;line-height:1;}
+.score-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;}
+.result-title{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;margin-bottom:8px;}
+.result-sub{font-size:13px;color:var(--muted2);margin-bottom:20px;line-height:1.6;}
+.result-stats{display:flex;justify-content:center;gap:32px;margin-bottom:24px;}
+.rs{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.rs-val{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;}
+.rs-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;}
+.result-actions{display:flex;gap:10px;justify-content:center;}
+.breakdown-title{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:12px;}
+.breakdown-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:8px;}
+.bi-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.bi-q{font-size:12px;color:var(--muted2);line-height:1.5;}
+.bi-badge{padding:2px 8px;border-radius:100px;font-size:10px;font-weight:700;font-family:'Syne',sans-serif;}
+.bi-correct{background:rgba(200,240,77,0.1);color:var(--accent);}
+.bi-wrong{background:rgba(240,77,122,0.1);color:var(--danger);}
+.bi-exp{font-size:11px;color:var(--muted2);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);line-height:1.5;}
+
+.error-msg{background:rgba(240,77,122,0.05);border:1px solid rgba(240,77,122,0.2);border-radius:6px;padding:12px;font-size:12px;color:var(--danger);margin-top:10px;display:none;}
+
+@media(max-width:768px){.layout{grid-template-columns:1fr;}.sidebar{border-right:none;border-bottom:1px solid var(--border);}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo"><span class="logo-dot"></span>Nexora</a>
+  <div class="nav-links">
+    <a href="session.html" class="nbtn">← Session</a>
+    <a href="dashboard.html" class="nbtn accent">Dashboard</a>
+    <div class="user-menu" id="userMenu" style="position:relative;display:inline-block;">
+      <button class="nbtn" onclick="document.getElementById('userDropdown').classList.toggle('open')" style="display:flex;align-items:center;gap:7px;">
+        <span id="userAvatar" style="width:20px;height:20px;border-radius:50%;background:rgba(200,240,77,0.15);border:1px solid rgba(200,240,77,0.3);display:inline-flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--accent);">?</span>
+        <span id="userGreeting">Hi…</span>
+        <span style="color:var(--muted);font-size:10px;">▾</span>
+      </button>
+      <div id="userDropdown" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,0.4);z-index:200;">
+        <div style="padding:8px 10px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+          <div id="dropdownName" style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;">—</div>
+        </div>
+        <a href="session.html" style="display:flex;gap:8px;padding:8px 10px;border-radius:5px;font-size:12px;color:var(--muted2);text-decoration:none;transition:background 0.15s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">📹 &nbsp;New Session</a>
+        <div onclick="localStorage.clear();window.location.href='login.html'" style="display:flex;gap:8px;padding:8px 10px;border-radius:5px;font-size:12px;color:var(--danger);cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='rgba(240,77,122,0.08)'" onmouseout="this.style.background=''">⎋ &nbsp;Logout</div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="panel">
+      <div class="panel-title">Quiz Mode</div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tabTopic" onclick="switchMode('topic')">By Topic</button>
+        <button class="mode-tab" id="tabDoc" onclick="switchMode('doc')">By Document</button>
+      </div>
+
+      <!-- Topic mode -->
+      <div id="topicMode">
+        <div class="f-field">
+          <label>Topic / Subject</label>
+          <input type="text" id="topicInput" placeholder="e.g. Quantum Mechanics"/>
+        </div>
+        <div class="f-field">
+          <label>Number of Questions</label>
+          <select id="countSelect">
+            <option value="3">3 questions</option>
+            <option value="5" selected>5 questions</option>
+            <option value="8">8 questions</option>
+            <option value="10">10 questions</option>
+          </select>
+        </div>
+        <div class="f-field">
+          <label>Difficulty</label>
+          <select id="diffSelect">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="error-msg" id="topicError"></div>
+        <button class="gen-btn" id="genBtn" onclick="generateTopicQuiz()">Generate Quiz →</button>
+      </div>
+
+      <!-- Document mode -->
+      <div id="docMode" style="display:none;">
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()"
+             ondragover="event.preventDefault();this.classList.add('dragover')"
+             ondragleave="this.classList.remove('dragover')"
+             ondrop="handleDrop(event)">
+          <div class="upload-zone-icon">📄</div>
+          <div class="upload-zone-text">Drop your PDF here or click to browse<br/>Notes, textbook chapters, slides</div>
+          <div class="upload-zone-file" id="fileLabel"></div>
+        </div>
+        <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(event)"/>
+        <div class="f-field">
+          <label>Number of Questions</label>
+          <select id="docCountSelect">
+            <option value="3">3 questions</option>
+            <option value="5" selected>5 questions</option>
+            <option value="8">8 questions</option>
+          </select>
+        </div>
+        <div class="f-field">
+          <label>Difficulty</label>
+          <select id="docDiffSelect">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="error-msg" id="docError"></div>
+        <button class="gen-btn" id="docGenBtn" onclick="generateDocQuiz()">Generate from PDF →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main" id="mainContent">
+
+    <!-- EMPTY STATE -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🧠</div>
+      <div class="empty-title">Test your knowledge</div>
+      <div class="empty-sub">Choose a topic or upload your notes, then generate a quiz to see how well you understood your study session.</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════
+   API HELPER
+════════════════════════════════════════ */
+const API_BASE = 'http://localhost:8000';
+
+function getToken()   { return localStorage.getItem('token'); }
+function getUserId()  { return localStorage.getItem('user_id'); }
+function getSessionId(){ return localStorage.getItem('session_id'); }
+
+async function api(path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: {
+      'Authorization': 'Bearer ' + getToken(),
+    },
+  };
+  if (body instanceof FormData) {
+    opts.body = body;  // let browser set Content-Type for multipart
+  } else if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const res  = await fetch(API_BASE + path, opts);
+  const data = await res.json();
+  if (!res.ok) {
+    if (res.status === 401) { localStorage.clear(); window.location.href = 'login.html'; }
+    throw new Error(data.detail || 'API error');
+  }
+  return data;
+}
+
+/* ════════════════════════════════════════
+   AUTH GUARD
+════════════════════════════════════════ */
+if (!getToken()) window.location.href = 'login.html';
+
+// User menu init
+(function() {
+  const name  = localStorage.getItem('name') || 'Student';
+  const first = name.split(' ')[0];
+  const av = document.getElementById('userAvatar');
+  const gr = document.getElementById('userGreeting');
+  const dn = document.getElementById('dropdownName');
+  if (av) av.textContent = name.charAt(0).toUpperCase();
+  if (gr) gr.textContent = `Hi, ${first}`;
+  if (dn) dn.textContent = name;
+})();
+
+document.addEventListener('click', (e) => {
+  const m = document.getElementById('userMenu');
+  const d = document.getElementById('userDropdown');
+  if (m && d && !m.contains(e.target)) d.style.display = 'none';
+});
+
+/* ════════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
+let currentMode      = 'topic';
+let currentQuiz      = null;   // {quiz_id, topic, questions}
+let userAnswers      = {};     // {question_index: selected_letter}
+let currentQuestion  = 0;
+let answeredCount    = 0;
+let selectedFile     = null;
+let quizSaved        = false;
+
+/* ════════════════════════════════════════
+   MODE SWITCH
+════════════════════════════════════════ */
+function switchMode(mode) {
+  currentMode = mode;
+  document.getElementById('tabTopic').className = 'mode-tab' + (mode==='topic'?' active':'');
+  document.getElementById('tabDoc').className   = 'mode-tab' + (mode==='doc'?' active':'');
+  document.getElementById('topicMode').style.display = mode==='topic' ? 'block' : 'none';
+  document.getElementById('docMode').style.display   = mode==='doc'   ? 'block' : 'none';
+}
+
+/* ════════════════════════════════════════
+   FILE HANDLING
+════════════════════════════════════════ */
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (file) {
+    selectedFile = file;
+    document.getElementById('fileLabel').textContent = '📎 ' + file.name;
+  }
+}
+
+function handleDrop(event) {
+  event.preventDefault();
+  document.getElementById('uploadZone').classList.remove('dragover');
+  const file = event.dataTransfer.files[0];
+  if (file && file.name.endsWith('.pdf')) {
+    selectedFile = file;
+    document.getElementById('fileLabel').textContent = '📎 ' + file.name;
+    document.getElementById('fileInput').files = event.dataTransfer.files;
+  }
+}
+
+/* ════════════════════════════════════════
+   GENERATE — TOPIC
+════════════════════════════════════════ */
+async function generateTopicQuiz() {
+  const topic = document.getElementById('topicInput').value.trim();
+  const errEl = document.getElementById('topicError');
+  errEl.style.display = 'none';
+
+  if (!topic) {
+    errEl.textContent = 'Please enter a topic.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  showLoading('Generating questions on ' + topic + '…', 'Claude is crafting your quiz — this takes about 10 seconds');
+
+  try {
+    const data = await api('/quiz/generate', 'POST', {
+      topic,
+      count:      parseInt(document.getElementById('countSelect').value),
+      difficulty: document.getElementById('diffSelect').value,
+    });
+    currentQuiz = data;
+    userAnswers = {};
+    currentQuestion = 0;
+    answeredCount   = 0;
+    quizSaved       = false;
+    renderQuiz();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    showEmpty();
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate Quiz →';
+  }
+}
+
+/* ════════════════════════════════════════
+   GENERATE — DOCUMENT
+════════════════════════════════════════ */
+async function generateDocQuiz() {
+  const errEl = document.getElementById('docError');
+  errEl.style.display = 'none';
+
+  if (!selectedFile) {
+    errEl.textContent = 'Please upload a PDF first.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('docGenBtn');
+  btn.disabled = true; btn.textContent = 'Processing…';
+  showLoading('Reading your document…', 'Extracting text and generating questions from your notes');
+
+  try {
+    const formData = new FormData();
+    formData.append('file',       selectedFile);
+    formData.append('count',      document.getElementById('docCountSelect').value);
+    formData.append('difficulty', document.getElementById('docDiffSelect').value);
+
+    const data = await api('/quiz/upload', 'POST', formData);
+    currentQuiz     = data;
+    userAnswers     = {};
+    currentQuestion = 0;
+    answeredCount   = 0;
+    quizSaved       = false;
+    renderQuiz();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    showEmpty();
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate from PDF →';
+  }
+}
+
+/* ════════════════════════════════════════
+   RENDER QUIZ
+════════════════════════════════════════ */
+function renderQuiz() {
+  const q   = currentQuiz.questions[currentQuestion];
+  const tot = currentQuiz.questions.length;
+  const pct = Math.round((answeredCount / tot) * 100);
+
+  document.getElementById('mainContent').innerHTML = `
+    <div class="quiz-header">
+      <div class="quiz-topic">${currentQuiz.topic}</div>
+      <div class="quiz-meta">${tot} questions · ${currentQuiz.difficulty} · Question ${currentQuestion+1} of ${tot}</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:${pct}%"></div></div>
+    </div>
+
+    <div class="question-card" id="questionCard">
+      <div class="q-num">Question ${currentQuestion + 1}</div>
+      <div class="q-text">${q.question}</div>
+      <div class="options" id="optionsDiv">
+        ${q.options.map((opt, i) => {
+          const letter = ['A','B','C','D'][i];
+          const isSelected = userAnswers[currentQuestion] === letter;
+          return `<button class="option-btn${isSelected?' selected':''}"
+            onclick="selectAnswer('${letter}', this)"
+            id="opt${letter}">
+            <span class="opt-letter">${letter}</span>
+            <span>${opt.replace(/^[A-D]\)\s*/,'')}</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <div class="explanation" id="explanation"></div>
+    </div>
+
+    <div class="quiz-nav">
+      <button class="nav-btn" onclick="prevQuestion()" ${currentQuestion===0?'disabled':''}>← Previous</button>
+      <span class="q-counter">${answeredCount} of ${tot} answered</span>
+      ${currentQuestion < tot-1
+        ? `<button class="nav-btn primary" onclick="nextQuestion()">Next →</button>`
+        : `<button class="nav-btn primary" onclick="submitQuiz()" id="submitBtn"
+             ${answeredCount < tot ? 'disabled' : ''}>
+             Submit Quiz →</button>`
+      }
+    </div>`;
+
+  // If already answered this question, show the result state
+  if (userAnswers[currentQuestion]) {
+    restoreAnswerState(currentQuestion);
+  }
+}
+
+function selectAnswer(letter, btn) {
+  // Already answered
+  if (userAnswers[currentQuestion]) return;
+
+  userAnswers[currentQuestion] = letter;
+  answeredCount = Object.keys(userAnswers).length;
+
+  // Highlight selected
+  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+
+  // Update counter + submit button
+  document.querySelector('.q-counter').textContent =
+    `${answeredCount} of ${currentQuiz.questions.length} answered`;
+
+  const submitBtn = document.getElementById('submitBtn');
+  if (submitBtn && answeredCount === currentQuiz.questions.length) {
+    submitBtn.disabled = false;
+  }
+
+  // Update progress bar
+  const pct = Math.round((answeredCount / currentQuiz.questions.length) * 100);
+  const pf  = document.getElementById('progressFill');
+  if (pf) pf.style.width = pct + '%';
+}
+
+function restoreAnswerState(qIndex) {
+  const selected = userAnswers[qIndex];
+  if (!selected) return;
+  const btn = document.getElementById('opt' + selected);
+  if (btn) { btn.classList.add('selected'); }
+}
+
+function nextQuestion() {
+  if (currentQuestion < currentQuiz.questions.length - 1) {
+    currentQuestion++;
+    renderQuiz();
+  }
+}
+
+function prevQuestion() {
+  if (currentQuestion > 0) {
+    currentQuestion--;
+    renderQuiz();
+  }
+}
+
+/* ════════════════════════════════════════
+   SUBMIT + EVALUATE
+════════════════════════════════════════ */
+async function submitQuiz() {
+  const btn = document.getElementById('submitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Evaluating…'; }
+
+  const answers = Object.entries(userAnswers).map(([qi, sel]) => ({
+    question_index: parseInt(qi),
+    selected:       sel,
+  }));
+
+  try {
+    const result = await api('/quiz/evaluate', 'POST', {
+      quiz_id: currentQuiz.quiz_id,
+      answers,
+    });
+
+    // Auto-save result
+    await saveResult(result);
+
+    renderResults(result);
+  } catch (err) {
+    showToast('Could not evaluate: ' + err.message);
+  }
+}
+
+async function saveResult(result) {
+  if (quizSaved) return;
+  try {
+    await api('/quiz/result', 'POST', {
+      quiz_id:    currentQuiz.quiz_id,
+      session_id: getSessionId() || null,
+      score_pct:  result.score_pct,
+      correct:    result.correct_count,
+      total:      result.total,
+      topic:      result.topic,
+    });
+    quizSaved = true;
+  } catch (err) {
+    console.warn('Could not save result:', err.message);
+  }
+}
+
+/* ════════════════════════════════════════
+   RENDER RESULTS
+════════════════════════════════════════ */
+// Store last result breakdown for explainer access
+let lastBreakdown = [];
+
+function renderResults(result) {
+  lastBreakdown = result.breakdown; // store for explainer
+  const score  = result.score_pct;
+  const color  = score >= 80 ? 'var(--accent)' : score >= 60 ? 'var(--warn)' : 'var(--danger)';
+  const offset = 298 - (score / 100) * 298;
+  const emoji  = score >= 80 ? '🔥' : score >= 60 ? '✅' : '📚';
+
+  const breakdownHtml = result.breakdown.map((b, i) => `
+    <div class="breakdown-item" id="breakdown-${i}">
+      <div class="bi-header">
+        <div style="font-size:11px;color:var(--muted)">Q${i+1}</div>
+        <span class="bi-badge ${b.is_correct?'bi-correct':'bi-wrong'}">${b.is_correct?'Correct':'Wrong'}</span>
+      </div>
+      <div class="bi-q">${b.question}</div>
+      ${!b.is_correct ? `<div style="font-size:11px;color:var(--muted);margin-top:4px;">
+        Your answer: <strong style="color:var(--danger)">${b.selected||'—'}</strong> &nbsp;
+        Correct: <strong style="color:var(--accent)">${b.correct}</strong>
+      </div>` : ''}
+      <div class="bi-exp">${b.explanation}</div>
+      ${!b.is_correct ? `
+        <div id="explain-area-${i}" style="margin-top:10px;">
+          <button onclick="openExplainer(${i})"
+            style="background:rgba(77,240,200,0.08);border:1px solid rgba(77,240,200,0.2);border-radius:5px;
+                   padding:7px 14px;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;
+                   color:var(--accent2);cursor:pointer;transition:all 0.15s;"
+            onmouseover="this.style.background='rgba(77,240,200,0.14)'"
+            onmouseout="this.style.background='rgba(77,240,200,0.08)'">
+            🤔 I still don't get it — explain differently
+          </button>
+          <div id="explainer-chat-${i}" style="display:none;margin-top:10px;"></div>
+        </div>` : ''}
+    </div>`).join('');
+
+  document.getElementById('mainContent').innerHTML = `
+    <div class="results-card">
+      <div class="score-ring">
+        <svg width="110" height="110" viewBox="0 0 110 110">
+          <circle class="score-bg" cx="55" cy="55" r="47"/>
+          <circle class="score-fill" cx="55" cy="55" r="47"
+            style="stroke:${color};stroke-dashoffset:${offset}"/>
+        </svg>
+        <div class="score-center">
+          <div class="score-num" style="color:${color}">${score}%</div>
+          <div class="score-lbl">Score</div>
+        </div>
+      </div>
+      <div class="result-title">${emoji} ${result.grade === 'strong' ? 'Excellent!' : result.grade === 'mid' ? 'Good effort!' : 'Keep studying!'}</div>
+      <div class="result-sub">${result.insight}</div>
+      <div class="result-stats">
+        <div class="rs"><div class="rs-val" style="color:var(--accent)">${result.correct_count}</div><div class="rs-lbl">Correct</div></div>
+        <div class="rs"><div class="rs-val" style="color:var(--danger)">${result.total - result.correct_count}</div><div class="rs-lbl">Wrong</div></div>
+        <div class="rs"><div class="rs-val">${result.total}</div><div class="rs-lbl">Total</div></div>
+      </div>
+      <div class="result-actions">
+        <button class="nav-btn primary" onclick="window.location.href='dashboard.html'">View Dashboard →</button>
+        <button class="nav-btn" onclick="resetQuiz()">Try Another</button>
+      </div>
+    </div>
+
+    <div class="breakdown-title">Question Breakdown</div>
+    ${breakdownHtml}`;
+}
+
+/* ════════════════════════════════════════
+   UI HELPERS
+════════════════════════════════════════ */
+function showLoading(title, sub) {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <div class="loading-text">${title}</div>
+      <div class="loading-sub">${sub}</div>
+    </div>`;
+}
+
+function showEmpty() {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🧠</div>
+      <div class="empty-title">Test your knowledge</div>
+      <div class="empty-sub">Choose a topic or upload your notes, then generate a quiz to see how well you understood your study session.</div>
+    </div>`;
+}
+
+/* ════════════════════════════════════════
+   QUIZ EXPLAINER CHATBOT
+════════════════════════════════════════ */
+const explainerHistories = {};  // {question_index: [{role,content}]}
+
+function openExplainer(qIndex) {
+  const chatDiv = document.getElementById(`explainer-chat-${qIndex}`);
+  const btn     = chatDiv.previousElementSibling;
+  if (btn) btn.style.display = 'none';
+  chatDiv.style.display = 'block';
+
+  if (!explainerHistories[qIndex]) {
+    explainerHistories[qIndex] = [];
+    // Auto-send first explanation request
+    sendExplainerMessage(qIndex, "Can you explain why I got this wrong?");
+  }
+}
+
+async function sendExplainerMessage(qIndex, userMsg) {
+  const b        = lastBreakdown[qIndex];
+  if (!b) return;
+
+  const chatDiv  = document.getElementById(`explainer-chat-${qIndex}`);
+
+  // Add user bubble
+  if (userMsg !== "Can you explain why I got this wrong?") {
+    appendExplainerBubble(chatDiv, userMsg, 'user');
+  }
+
+  // Typing indicator
+  const typing = document.createElement('div');
+  typing.style.cssText = 'font-size:11px;color:var(--muted);padding:4px 0;';
+  typing.textContent   = 'Tutor is thinking…';
+  chatDiv.appendChild(typing);
+
+  explainerHistories[qIndex].push({ role: 'user', content: userMsg });
+
+  try {
+    const res = await api('/chat/explain', 'POST', {
+      question:    b.question,
+      options:     currentQuiz?.questions?.[qIndex]?.options || [],
+      correct:     b.correct,
+      explanation: b.explanation,
+      user_answer: b.selected,
+      topic:       currentQuiz?.topic || '',
+      message:     userMsg,
+      history:     explainerHistories[qIndex].slice(-4),
+    });
+
+    typing.remove();
+    appendExplainerBubble(chatDiv, res.reply, 'bot');
+    explainerHistories[qIndex].push({ role: 'assistant', content: res.reply });
+
+    // Add follow-up input
+    if (!chatDiv.querySelector('.explainer-input-row')) {
+      const inputRow = document.createElement('div');
+      inputRow.className = 'explainer-input-row';
+      inputRow.style.cssText = 'display:flex;gap:6px;margin-top:8px;';
+      inputRow.innerHTML = `
+        <input type="text" placeholder="Ask a follow-up…"
+          style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:5px;
+                 padding:7px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none;"
+          onkeydown="if(event.key==='Enter'){const v=this.value.trim();if(v){sendExplainerMessage(${qIndex},v);this.value='';}}"/>
+        <button onclick="const i=this.previousElementSibling;const v=i.value.trim();if(v){sendExplainerMessage(${qIndex},v);i.value='';}"
+          style="background:var(--accent);color:#0b0c0f;border:none;border-radius:5px;padding:7px 12px;
+                 font-family:'Syne',sans-serif;font-weight:700;font-size:10px;cursor:pointer;">Go</button>`;
+      chatDiv.appendChild(inputRow);
+    }
+
+  } catch(err) {
+    typing.remove();
+    appendExplainerBubble(chatDiv, 'Could not connect to tutor. Make sure backend is running.', 'bot');
+  }
+}
+
+function appendExplainerBubble(container, text, role) {
+  const bubble = document.createElement('div');
+  bubble.style.cssText = `
+    padding:8px 11px;border-radius:7px;font-size:11px;line-height:1.55;margin-bottom:6px;
+    ${role === 'user'
+      ? 'background:rgba(200,240,77,0.07);border:1px solid rgba(200,240,77,0.15);color:var(--text);margin-left:20px;'
+      : 'background:var(--surface2);border:1px solid var(--border);color:var(--muted2);margin-right:20px;'}`;
+  bubble.textContent = text;
+  container.insertBefore(bubble, container.querySelector('.explainer-input-row'));
+}
+
+function resetQuiz() {
+  currentQuiz     = null;
+  userAnswers     = {};
+  currentQuestion = 0;
+  answeredCount   = 0;
+  quizSaved       = false;
+  showEmpty();
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid rgba(240,77,122,0.3);border-radius:8px;padding:12px 16px;font-size:12px;color:var(--danger);z-index:1000;max-width:280px;';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
+</script>
+</body>
+</html>

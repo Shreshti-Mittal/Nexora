@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Nexora — Analytics</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0b0c0f;--surface:#13151a;--surface2:#1c1f27;
+  --border:#252830;--accent:#c8f04d;--accent2:#4df0c8;
+  --warn:#f09d4d;--danger:#f04d7a;
+  --text:#e8eaf0;--muted:#6b7280;--muted2:#9ca3af;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;font-size:13px;min-height:100vh;overflow-x:hidden;}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:0.28;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");}
+
+/* NAV */
+nav{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:50;}
+.logo{font-family:"Syne",sans-serif;font-weight:800;font-size:17px;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:8px;}
+.logo-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+.nav-r{display:flex;gap:8px;align-items:center;}
+.nbtn{padding:7px 14px;border-radius:5px;font-family:"Syne",sans-serif;font-weight:700;font-size:11px;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text);text-decoration:none;transition:border-color 0.15s;display:inline-flex;align-items:center;white-space:nowrap;}
+.nbtn:hover{border-color:var(--muted);}
+.nbtn.primary{background:var(--accent);color:#0b0c0f;border-color:transparent;}
+.nbtn.primary:hover{opacity:0.88;}
+.rtabs{display:flex;gap:2px;background:rgba(37,40,48,0.8);border-radius:5px;padding:2px;}
+.rtab{padding:5px 12px;border-radius:3px;font-family:"Syne",sans-serif;font-weight:700;font-size:10px;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all 0.15s;letter-spacing:0.05em;text-transform:uppercase;}
+.rtab.active{background:var(--surface2);color:var(--text);}
+
+/* USER MENU */
+.user-menu{position:relative;display:inline-block;}
+.user-btn{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-family:'DM Mono',monospace;font-size:12px;transition:border-color 0.15s;}
+.user-btn:hover{border-color:var(--muted);}
+.user-avatar{width:24px;height:24px;border-radius:50%;background:rgba(200,240,77,0.15);border:1px solid rgba(200,240,77,0.3);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:11px;color:var(--accent);flex-shrink:0;}
+.user-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,0.4);display:none;z-index:200;}
+.user-dropdown.open{display:block;}
+.dropdown-header{padding:8px 10px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;}
+.dropdown-name{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--text);}
+.dropdown-email{font-size:10px;color:var(--muted);margin-top:2px;}
+.dropdown-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:5px;font-size:12px;color:var(--muted2);cursor:pointer;transition:background 0.15s;text-decoration:none;}
+.dropdown-item:hover{background:var(--surface2);color:var(--text);}
+.dropdown-item.danger{color:var(--danger);}
+.dropdown-item.danger:hover{background:rgba(240,77,122,0.08);}
+
+/* LAYOUT */
+.page{padding:20px 24px;max-width:1360px;margin:0 auto;}
+
+/* HEADER */
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;}
+.hdr-title{font-family:"Syne",sans-serif;font-weight:800;font-size:20px;letter-spacing:-0.5px;}
+.hdr-sub{font-size:11px;color:var(--muted);margin-top:3px;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
+.sc-l{font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:5px;}
+.sc-v{font-family:"Syne",sans-serif;font-weight:800;font-size:19px;letter-spacing:-0.5px;line-height:1;}
+.sc-d{font-size:10px;margin-top:4px;}
+.up{color:var(--accent);}.dn{color:var(--danger);}.fl{color:var(--muted);}
+
+/* GRID ROWS */
+.row{display:grid;gap:10px;margin-bottom:10px;}
+.r2{grid-template-columns:1fr 1fr;}
+.r31{grid-template-columns:3fr 1fr;}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:16px;min-width:0;overflow:hidden;}
+.ch{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:8px;}
+.ct{font-family:"Instrument Serif",serif;font-style:italic;font-size:14px;line-height:1.2;}
+.cs{font-size:10px;color:var(--muted);margin-top:2px;}
+.ctag{font-size:9px;padding:2px 7px;border-radius:100px;background:rgba(200,240,77,0.08);color:var(--accent);border:1px solid rgba(200,240,77,0.18);flex-shrink:0;}
+.cw{position:relative;width:100%;}
+.cw canvas{display:block;}
+
+/* TABLES */
+.tt{width:100%;border-collapse:collapse;}
+.tt th{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);padding:0 0 9px;text-align:left;font-weight:500;border-bottom:1px solid var(--border);}
+.tt td{padding:8px 0;border-bottom:1px solid rgba(37,40,48,0.4);font-size:11px;vertical-align:middle;}
+.tt tr:last-child td{border-bottom:none;}
+.tbar-w{display:flex;align-items:center;gap:8px;}
+.tbar{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;min-width:30px;}
+.tbar-f{height:100%;border-radius:2px;}
+.tbadge{padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;}
+.b-s{background:rgba(200,240,77,0.1);color:var(--accent);}
+.b-m{background:rgba(240,157,77,0.1);color:var(--warn);}
+.b-w{background:rgba(240,77,122,0.1);color:var(--danger);}
+
+/* INSIGHTS */
+.ins{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:6px;margin-bottom:7px;border:1px solid;font-size:11px;line-height:1.55;}
+.ins:last-child{margin-bottom:0;}
+.i-g{background:rgba(200,240,77,0.03);border-color:rgba(200,240,77,0.16);}
+.i-o{background:rgba(240,157,77,0.03);border-color:rgba(240,157,77,0.2);}
+.i-r{background:rgba(240,77,122,0.03);border-color:rgba(240,77,122,0.16);}
+.i-b{background:rgba(77,240,200,0.03);border-color:rgba(77,240,200,0.16);}
+.i-ico{flex-shrink:0;width:15px;height:15px;margin-top:1px;}
+.i-tt{font-family:"Syne",sans-serif;font-weight:700;font-size:11px;margin-bottom:1px;}
+.i-bd{color:var(--muted2);}
+
+/* SESSIONS */
+.si{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(37,40,48,0.4);font-size:11px;}
+.si:last-child{border-bottom:none;}
+.si-name{color:var(--text);}
+.si-date{color:var(--muted);font-size:10px;margin-top:2px;}
+.si-r{display:flex;gap:14px;}
+.si-m{display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
+.si-mv{font-family:"Syne",sans-serif;font-weight:700;font-size:12px;}
+.si-ml{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+
+/* LOADING / EMPTY */
+.loading-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;color:var(--muted);gap:10px;}
+.loading-spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty-state{color:var(--muted);font-size:12px;text-align:center;padding:20px;line-height:1.7;}
+
+/* SCROLLABLE */
+.scrl{overflow-y:auto;max-height:230px;}
+.scrl::-webkit-scrollbar{width:2px;}
+.scrl::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* VISUAL POLISH */
+.sc{transition:transform 0.2s,box-shadow 0.2s;}
+.sc:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,0.3);}
+.card{transition:box-shadow 0.2s;}
+.card:hover{box-shadow:0 2px 16px rgba(0,0,0,0.25);}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.page>*{animation:fadeInUp 0.4s ease forwards;opacity:0;}
+.page>*:nth-child(1){animation-delay:0.05s;}
+.page>*:nth-child(2){animation-delay:0.1s;}
+.page>*:nth-child(3){animation-delay:0.15s;}
+.page>*:nth-child(4){animation-delay:0.2s;}
+.page>*:nth-child(5){animation-delay:0.25s;}
+.page>*:nth-child(6){animation-delay:0.3s;}
+
+/* CORRELATION CARD */
+.corr-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(37,40,48,0.5);}
+.corr-item:last-child{border-bottom:none;}
+.corr-topic-name{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+.corr-bars{display:flex;flex-direction:column;gap:3px;flex:0 0 160px;}
+.corr-bar-row{display:flex;align-items:center;gap:6px;font-size:9px;}
+.corr-bar-label{color:var(--muted);width:36px;text-align:right;flex-shrink:0;}
+.corr-bar-track{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.corr-bar-fill{height:100%;border-radius:3px;transition:width 0.8s ease;}
+.corr-val{font-family:'Syne',sans-serif;font-weight:700;font-size:11px;flex-shrink:0;width:28px;text-align:right;}
+.corr-tag{padding:2px 7px;border-radius:100px;font-size:9px;font-weight:700;font-family:'Syne',sans-serif;flex-shrink:0;}
+.corr-tag.gap{background:rgba(240,77,122,0.1);color:var(--danger);}
+.corr-tag.ok{background:rgba(200,240,77,0.1);color:var(--accent);}
+.corr-tag.tired{background:rgba(240,157,77,0.1);color:var(--warn);}
+.corr-tag.solid{background:rgba(77,240,200,0.1);color:var(--accent2);}
+
+@media(max-width:1024px){.stats{grid-template-columns:repeat(3,1fr);}.r31{grid-template-columns:1fr;}}
+@media(max-width:720px){.r2,.r31{grid-template-columns:1fr;}.stats{grid-template-columns:1fr 1fr;}.page{padding:12px;}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo"><span class="logo-dot"></span>Nexora</a>
+  <div class="nav-r">
+    <div class="rtabs">
+      <button class="rtab" onclick="setRange(7, this)">7d</button>
+      <button class="rtab active" onclick="setRange(30, this)">30d</button>
+      <button class="rtab" onclick="setRange(365, this)">All</button>
+    </div>
+    <a href="session.html" class="nbtn primary">+ New Session</a>
+    <div class="user-menu" id="userMenu">
+      <button class="user-btn" onclick="toggleUserMenu()">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <span id="userGreeting">Hi…</span>
+        <span style="color:var(--muted);font-size:10px;">▾</span>
+      </button>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dropdown-header">
+          <div class="dropdown-name" id="dropdownName">—</div>
+          <div class="dropdown-email" id="dropdownEmail">—</div>
+        </div>
+        <a href="session.html" class="dropdown-item">📹 &nbsp;New Session</a>
+        <a href="quiz.html"    class="dropdown-item">🧠 &nbsp;Take a Quiz</a>
+        <div class="dropdown-item danger" onclick="logout()">⎋ &nbsp;Logout</div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page">
+
+  <div class="hdr">
+    <div>
+      <div class="hdr-title">Analytics</div>
+      <div class="hdr-sub" id="hdrSub">Loading…</div>
+    </div>
+  </div>
+
+  <!-- STAT STRIP -->
+  <div class="stats">
+    <div class="sc"><div class="sc-l">Study Time</div><div class="sc-v" id="statTime">—</div><div class="sc-d fl" id="statTimeSub">&nbsp;</div></div>
+    <div class="sc"><div class="sc-l">Avg Focus</div><div class="sc-v" id="statFocus" style="color:var(--accent)">—</div><div class="sc-d fl" id="statFocusSub">&nbsp;</div></div>
+    <div class="sc"><div class="sc-l">Avg Fatigue</div><div class="sc-v" id="statFatigue" style="color:var(--warn)">—</div><div class="sc-d fl">&nbsp;</div></div>
+    <div class="sc"><div class="sc-l">Sessions</div><div class="sc-v" id="statSessions">—</div><div class="sc-d fl">&nbsp;</div></div>
+    <div class="sc"><div class="sc-l">Avg Session</div><div class="sc-v" id="statAvgMin">—</div><div class="sc-d fl">&nbsp;</div></div>
+  </div>
+
+  <!-- ROW 1 -->
+  <div class="row r2">
+    <div class="card">
+      <div class="ch">
+        <div><div class="ct">Focus over time</div><div class="cs">Daily avg focus score</div></div>
+        <span class="ctag">Focus</span>
+      </div>
+      <div class="cw" style="height:148px"><canvas id="cFocus"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ch">
+        <div><div class="ct">Weekly pattern</div><div class="cs">Minutes studied per day</div></div>
+        <span class="ctag">Time</span>
+      </div>
+      <div class="cw" style="height:148px"><canvas id="cWeek"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 2 -->
+  <div class="row r2">
+    <div class="card">
+      <div class="ch">
+        <div><div class="ct">Topic performance</div><div class="cs">Avg focus by subject</div></div>
+      </div>
+      <div class="scrl">
+        <table class="tt">
+          <thead><tr><th>Subject</th><th>Avg Focus</th><th>Sessions</th><th>Grade</th></tr></thead>
+          <tbody id="topicBody">
+            <tr><td colspan="4"><div class="loading-state"><div class="loading-spinner"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;">
+      <div class="ch" style="margin-bottom:8px;">
+        <div><div class="ct">Focus distribution</div><div class="cs">High / mid / low split</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;flex:1;">
+        <div class="cw" style="height:110px;flex:0 0 110px;"><canvas id="cDonut"></canvas></div>
+        <div id="donutLegend" style="font-size:10px;display:flex;flex-direction:column;gap:7px;">
+          <!-- filled by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW CORRELATION — Focus vs Quiz -->
+  <div class="row" style="margin-bottom:10px;">
+    <div class="card">
+      <div class="ch" style="margin-bottom:14px;">
+        <div>
+          <div class="ct">Focus vs Quiz Correlation</div>
+          <div class="cs">The core insight — were you focused AND did you understand?</div>
+        </div>
+        <span class="ctag">Innovation</span>
+      </div>
+      <div id="correlationList">
+        <div class="loading-state"><div class="loading-spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3 -->
+  <div class="row r31">
+    <div style="display:flex;flex-direction:column;gap:10px;min-width:0;">
+      <div class="card" style="flex:1;">
+        <div class="ch" style="margin-bottom:10px;"><div><div class="ct">Patterns &amp; insights</div><div class="cs">What the data says</div></div></div>
+        <div id="insightsList">
+          <div class="loading-state"><div class="loading-spinner"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch" style="margin-bottom:8px;"><div class="ct">Recent sessions</div></div>
+      <div id="sessionList">
+        <div class="loading-state"><div class="loading-spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ════════════════════════════════════════
+   API HELPER
+════════════════════════════════════════ */
+const API_BASE = 'http://127.0.0.1:8000';
+
+function getToken()  { return localStorage.getItem('token'); }
+function getUserId() { return localStorage.getItem('user_id'); }
+
+async function api(path) {
+  const res  = await fetch(API_BASE + path, {
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': 'Bearer ' + getToken(),
+    }
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    if (res.status === 401) { localStorage.clear(); window.location.href = 'login.html'; }
+    throw new Error(data.detail || 'API error');
+  }
+  return data;
+}
+
+/* ════════════════════════════════════════
+   AUTH GUARD
+════════════════════════════════════════ */
+if (!getToken() || !getUserId()) {
+  window.location.href = 'login.html';
+}
+
+/* ════════════════════════════════════════
+   CHART INSTANCES (kept so we can destroy
+   and redraw when range changes)
+════════════════════════════════════════ */
+let chartFocus = null;
+let chartWeek  = null;
+let chartDonut = null;
+
+/* global chart defaults */
+Chart.defaults.color       = '#6b7280';
+Chart.defaults.borderColor = '#252830';
+Chart.defaults.font.family = "'DM Mono', monospace";
+Chart.defaults.font.size   = 10;
+Chart.defaults.maintainAspectRatio = false;
+
+const GC = 'rgba(37,40,48,0.7)';
+
+/* ════════════════════════════════════════
+   CURRENT RANGE (days)
+════════════════════════════════════════ */
+let currentRange = 30;
+
+function setRange(days, btn) {
+  document.querySelectorAll('.rtab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentRange = days;
+  loadDashboard(days);
+}
+
+/* ════════════════════════════════════════
+   MAIN LOAD
+════════════════════════════════════════ */
+async function loadDashboard(rangeDays = 30) {
+  const userId = getUserId();
+  try {
+    const data = await api(`/analytics/user/${userId}?range_days=${rangeDays}`);
+    renderAll(data);
+  } catch (err) {
+    document.getElementById('hdrSub').textContent = 'Failed to load — is the backend running?';
+    console.error('Dashboard load error:', err);
+  }
+}
+
+/* ════════════════════════════════════════
+   RENDER ALL SECTIONS
+════════════════════════════════════════ */
+function renderAll(d) {
+
+  // ── Header sub ───────────────────────
+  const rangeLabel = currentRange === 365 ? 'All time' : `Last ${currentRange} days`;
+  document.getElementById('hdrSub').textContent =
+    `${rangeLabel} · ${d.total_sessions} session${d.total_sessions !== 1 ? 's' : ''}`;
+
+  // ── Stat strip ───────────────────────
+  const totalH = Math.floor(d.total_study_hours);
+  const totalM = Math.round((d.total_study_hours - totalH) * 60);
+  document.getElementById('statTime').textContent     = `${totalH}h ${totalM}m`;
+  document.getElementById('statFocus').textContent    = d.avg_focus_score ? `${d.avg_focus_score}%` : '—';
+  document.getElementById('statFatigue').textContent  = d.avg_fatigue_index ? `${d.avg_fatigue_index}%` : '—';
+  document.getElementById('statSessions').textContent = d.total_sessions;
+  document.getElementById('statAvgMin').textContent   = d.avg_session_min ? `${d.avg_session_min}m` : '—';
+
+  // Focus color
+  const fc = d.avg_focus_score >= 70 ? 'var(--accent)' : d.avg_focus_score >= 50 ? 'var(--warn)' : 'var(--danger)';
+  document.getElementById('statFocus').style.color = fc;
+
+  // ── Focus trend chart ────────────────
+  renderFocusChart(d.focus_trend);
+
+  // ── Weekly pattern chart ─────────────
+  renderWeekChart(d.weekly_distribution);
+
+  // ── Topic table ──────────────────────
+  renderTopicTable(d.topic_performance);
+
+  // ── Donut ────────────────────────────
+  renderDonut(d.topic_performance);
+
+  // ── Insights ─────────────────────────
+  renderInsights(d.insights);
+
+  // ── Recent sessions ──────────────────
+  renderSessions(d.recent_sessions);
+
+  // ── Correlation ───────────────────────
+  renderCorrelation(d.topic_performance, d.recent_sessions);
+}
+
+/* ── Focus line chart ─────────────────── */
+function renderFocusChart(trend) {
+  if (chartFocus) { chartFocus.destroy(); chartFocus = null; }
+
+  if (!trend || trend.length === 0) {
+    document.getElementById('cFocus').parentElement.innerHTML =
+      '<div class="empty-state">No data yet.<br/>Complete a session to see your focus trend.</div>';
+    return;
+  }
+
+  const labels = trend.map(t => t.date);
+  const values = trend.map(t => t.avg_focus);
+
+  chartFocus = new Chart(document.getElementById('cFocus'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Focus',
+        data: values,
+        borderColor: '#c8f04d',
+        backgroundColor: 'rgba(200,240,77,0.07)',
+        fill: true, tension: 0.4,
+        pointRadius: 3, pointBackgroundColor: '#c8f04d', pointBorderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { min: 0, max: 100, grid: { color: GC }, ticks: { callback: v => v + '%', maxTicksLimit: 5 } },
+        x: { grid: { display: false }, ticks: { maxRotation: 0 } },
+      }
+    }
+  });
+}
+
+/* ── Weekly bar chart ─────────────────── */
+function renderWeekChart(weekly) {
+  if (chartWeek) { chartWeek.destroy(); chartWeek = null; }
+
+  const days   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const values = days.map(d => weekly[d] || 0);
+
+  chartWeek = new Chart(document.getElementById('cWeek'), {
+    type: 'bar',
+    data: {
+      labels: days,
+      datasets: [{
+        data: values,
+        backgroundColor: ctx => {
+          const v = ctx.raw;
+          return v >= 120 ? '#c8f04d' : v >= 60 ? 'rgba(200,240,77,0.4)' : 'rgba(200,240,77,0.15)';
+        },
+        borderRadius: 3, borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { grid: { color: GC }, ticks: { callback: v => v + 'm', maxTicksLimit: 4 } },
+        x: { grid: { display: false } },
+      }
+    }
+  });
+}
+
+/* ── Topic table ──────────────────────── */
+function renderTopicTable(topics) {
+  const tb = document.getElementById('topicBody');
+  if (!topics || topics.length === 0) {
+    tb.innerHTML = '<tr><td colspan="4"><div class="empty-state">No sessions yet.</div></td></tr>';
+    return;
+  }
+  tb.innerHTML = topics.map(t => {
+    const col = t.grade === 'strong' ? 'var(--accent)' : t.grade === 'mid' ? 'var(--warn)' : 'var(--danger)';
+    const cls = t.grade === 'strong' ? 'b-s' : t.grade === 'mid' ? 'b-m' : 'b-w';
+    const lbl = t.grade === 'strong' ? 'strong' : t.grade === 'mid' ? 'mid' : 'weak';
+    const score = t.avg_focus || 0;
+    return `<tr>
+      <td style="color:var(--muted2);padding-right:10px;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.topic}</td>
+      <td><div class="tbar-w">
+        <div class="tbar"><div class="tbar-f" style="width:${score}%;background:${col}"></div></div>
+        <span style="color:${col};font-family:'Syne',sans-serif;font-weight:700;font-size:11px;min-width:26px;text-align:right">${score}%</span>
+      </div></td>
+      <td style="color:var(--muted);text-align:center;padding:0 8px">${t.sessions}</td>
+      <td><span class="tbadge ${cls}">${lbl}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Donut ────────────────────────────── */
+function renderDonut(topics) {
+  if (chartDonut) { chartDonut.destroy(); chartDonut = null; }
+
+  // Derive high/mid/low split from topic performance
+  let high = 0, mid = 0, low = 0;
+  (topics || []).forEach(t => {
+    if (t.grade === 'strong') high++;
+    else if (t.grade === 'mid') mid++;
+    else low++;
+  });
+  const total = high + mid + low || 1;
+  const hp = Math.round(high / total * 100);
+  const mp = Math.round(mid  / total * 100);
+  const lp = 100 - hp - mp;
+
+  chartDonut = new Chart(document.getElementById('cDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: ['High', 'Mid', 'Low'],
+      datasets: [{ data: [hp, mp, lp], backgroundColor: ['#c8f04d', '#f09d4d', '#f04d7a'], borderWidth: 0, hoverOffset: 3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '74%',
+      plugins: { legend: { display: false } },
+    }
+  });
+
+  document.getElementById('donutLegend').innerHTML = `
+    <div style="display:flex;align-items:center;gap:7px;"><span style="width:8px;height:8px;border-radius:2px;background:var(--accent);display:inline-block;flex-shrink:0;"></span><span style="color:var(--muted2)">High (&gt;70) &nbsp;<strong style="color:var(--text)">${hp}%</strong></span></div>
+    <div style="display:flex;align-items:center;gap:7px;"><span style="width:8px;height:8px;border-radius:2px;background:var(--warn);display:inline-block;flex-shrink:0;"></span><span style="color:var(--muted2)">Mid (45–70) &nbsp;<strong style="color:var(--text)">${mp}%</strong></span></div>
+    <div style="display:flex;align-items:center;gap:7px;"><span style="width:8px;height:8px;border-radius:2px;background:var(--danger);display:inline-block;flex-shrink:0;"></span><span style="color:var(--muted2)">Low (&lt;45) &nbsp;<strong style="color:var(--text)">${lp}%</strong></span></div>`;
+}
+
+/* ── Insights ─────────────────────────── */
+const INSIGHT_ICONS = {
+  positive: `<svg class="i-ico" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
+  warning:  `<svg class="i-ico" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  gap:      `<svg class="i-ico" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  fatigue:  `<svg class="i-ico" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  pattern:  `<svg class="i-ico" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  habit:    `<svg class="i-ico" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  inactivity:`<svg class="i-ico" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+};
+
+const SEVERITY_CLASS = { green: 'i-g', orange: 'i-o', red: 'i-r', blue: 'i-b' };
+
+function renderInsights(insights) {
+  const el = document.getElementById('insightsList');
+  if (!insights || insights.length === 0) {
+    el.innerHTML = '<div class="empty-state">Complete more sessions to unlock insights.</div>';
+    return;
+  }
+  el.innerHTML = insights.map(ins => {
+    const icon = INSIGHT_ICONS[ins.type] || INSIGHT_ICONS['habit'];
+    const cls  = SEVERITY_CLASS[ins.severity] || 'i-b';
+    return `<div class="ins ${cls}">${icon}<div><div class="i-tt">${ins.title}</div><div class="i-bd">${ins.body}</div></div></div>`;
+  }).join('');
+}
+
+/* ── Recent sessions ──────────────────── */
+function renderSessions(sessions) {
+  const el = document.getElementById('sessionList');
+  if (!sessions || sessions.length === 0) {
+    el.innerHTML = '<div class="empty-state">No sessions yet.</div>';
+    return;
+  }
+  el.innerHTML = sessions.map(s => {
+    const fc = (s.avg_focus >= 70) ? 'var(--accent)' : (s.avg_focus >= 50) ? 'var(--warn)' : 'var(--danger)';
+    const focusVal  = s.avg_focus  != null ? `${s.avg_focus}%`  : '—';
+    const fatigueVal= s.avg_fatigue!= null ? `${s.avg_fatigue}%`: '—';
+    return `<div class="si">
+      <div>
+        <div class="si-name">${s.topic}</div>
+        <div class="si-date">${s.ended_at} · ${s.duration_min}m</div>
+      </div>
+      <div class="si-r">
+        <div class="si-m"><div class="si-mv" style="color:${fc}">${focusVal}</div><div class="si-ml">Focus</div></div>
+        <div class="si-m"><div class="si-mv" style="color:var(--warn)">${fatigueVal}</div><div class="si-ml">Fatigue</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── Focus vs Quiz Correlation ─────────── */
+function renderCorrelation(topics, sessions) {
+  const el = document.getElementById('correlationList');
+  if (!topics || topics.length === 0) {
+    el.innerHTML = '<div class="empty-state">Complete more sessions to see correlation data.</div>';
+    return;
+  }
+
+  // Build quiz score map from recent sessions (topic → avg quiz score)
+  // Sessions don't carry quiz scores directly so we show focus data with insight tags
+  el.innerHTML = topics.slice(0, 6).map(t => {
+    const focus = t.avg_focus || 0;
+    const focusColor = focus >= 70 ? 'var(--accent)' : focus >= 50 ? 'var(--warn)' : 'var(--danger)';
+
+    // Generate correlation insight tag based on focus grade
+    // In a full implementation, quiz scores would come from quiz_results collection
+    // For now we use the grade + pattern to generate insight
+    let tag = '', tagClass = '', insight = '';
+    if (t.grade === 'strong') {
+      tag = 'Solid'; tagClass = 'solid';
+      insight = 'High focus + strong performance. Keep it up.';
+    } else if (t.grade === 'mid') {
+      tag = 'Review'; tagClass = 'ok';
+      insight = 'Moderate focus. More targeted sessions will help.';
+    } else {
+      tag = 'Needs Work'; tagClass = 'gap';
+      insight = 'Low focus on this topic — comprehension likely affected.';
+    }
+
+    return `<div class="corr-item">
+      <div style="flex:1;min-width:0;">
+        <div class="corr-topic-name">${t.topic}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">${insight}</div>
+      </div>
+      <div class="corr-bars">
+        <div class="corr-bar-row">
+          <span class="corr-bar-label">Focus</span>
+          <div class="corr-bar-track">
+            <div class="corr-bar-fill" style="width:${focus}%;background:${focusColor}"></div>
+          </div>
+          <span class="corr-val" style="color:${focusColor}">${focus}%</span>
+        </div>
+        <div class="corr-bar-row">
+          <span class="corr-bar-label">Sessions</span>
+          <div class="corr-bar-track">
+            <div class="corr-bar-fill" style="width:${Math.min(100,t.sessions*20)}%;background:var(--accent2)"></div>
+          </div>
+          <span class="corr-val" style="color:var(--accent2)">${t.sessions}</span>
+        </div>
+      </div>
+      <span class="corr-tag ${tagClass}">${tag}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════
+   KICK OFF
+════════════════════════════════════════ */
+// User menu init
+(function() {
+  const name    = localStorage.getItem('name') || 'Student';
+  const initial = name.charAt(0).toUpperCase();
+  const first   = name.split(' ')[0];
+  document.getElementById('userAvatar').textContent   = initial;
+  document.getElementById('userGreeting').textContent = `Hi, ${first}`;
+  document.getElementById('dropdownName').textContent  = name;
+  document.getElementById('dropdownEmail').textContent = localStorage.getItem('email') || 'Logged in';
+})();
+
+function toggleUserMenu() {
+  document.getElementById('userDropdown').classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+  const m = document.getElementById('userMenu');
+  if (m && !m.contains(e.target)) document.getElementById('userDropdown').classList.remove('open');
+});
+function logout() {
+  localStorage.clear();
+  window.location.href = 'login.html';
+}
+
+loadDashboard(30);
+</script>
+</body>
+</html>
